@@ -48,6 +48,9 @@ fun RealOutdoorArenaScreen(
     val alertMessage by engine.alertMessage.collectAsState()
     val nearbyTarget by engine.nearbyTarget.collectAsState()
     val nearbyDistance by engine.nearbyDistance.collectAsState()
+    val radarCountdown by engine.radarCountdown.collectAsState()
+    val radarRevealActive by engine.radarRevealActive.collectAsState()
+    val radarRevealSecondsLeft by engine.radarRevealSecondsLeft.collectAsState()
 
     val currentLocation by locationManager.currentLocation.collectAsState()
     val userLat = currentLocation?.latitude ?: safeZone.centerLatitude
@@ -60,7 +63,7 @@ fun RealOutdoorArenaScreen(
 
     var miniMapMode by remember { mutableStateOf(MiniMapDisplayMode.CORNER) }
     var isCameraActive by remember { mutableStateOf(false) }
-    var useStreetTilesMap by remember { mutableStateOf(true) }
+    var useStreetTilesMap by remember { mutableStateOf(false) }
     var recenterTrigger by remember { mutableStateOf(0) }
 
     // Pulsing Urgency Animation synchronized with timer
@@ -99,11 +102,26 @@ fun RealOutdoorArenaScreen(
     val shockwaveAlpha = (1f - pulseProgress) * (0.35f + urgencyLevel * 0.55f)
     val shockwaveExpansionDp = (8f + urgencyLevel * 20f).dp
 
-    // Safe zone proximity math
-    val distToCenter = LiveLocationManager.distanceMeters(
-        userLat, userLon,
-        safeZone.centerLatitude, safeZone.centerLongitude
-    )
+    // Safe zone proximity math with auto-anchor protection
+    val distToCenter = if (userLat != 0.0 && safeZone.centerLatitude != 0.0) {
+        LiveLocationManager.distanceMeters(
+            userLat, userLon,
+            safeZone.centerLatitude, safeZone.centerLongitude
+        )
+    } else 0f
+
+    LaunchedEffect(userLat, userLon) {
+        if (userLat != 0.0 && userLon != 0.0) {
+            val dist = LiveLocationManager.distanceMeters(
+                userLat, userLon,
+                safeZone.centerLatitude, safeZone.centerLongitude
+            )
+            if (dist > 1200f) {
+                engine.anchorGameToLocation(userLat, userLon)
+            }
+        }
+    }
+
     val distToEdge = distToCenter - safeZone.currentRadiusMeters
     val isInsideSafeZone = distToEdge <= 0f
 
@@ -125,7 +143,7 @@ fun RealOutdoorArenaScreen(
             .fillMaxSize()
             .background(DarkBackground)
     ) {
-        // 1. DUAL MAP ENGINE: OPENSTREETMAP TACTICAL TILES OR NATIVE CANVAS RADAR
+        // 1. DUAL MAP ENGINE: NATIVE CANVAS RADAR (Zero Crash) OR OPTIONAL WEB TILES
         if (useStreetTilesMap) {
             LeafletMapView(
                 modifier = Modifier.fillMaxSize(),
@@ -137,6 +155,7 @@ fun RealOutdoorArenaScreen(
                 runners = players.filter { it.role == PlayerRole.RUNNER },
                 isRadarPulseActive = sonarActive,
                 recenterTrigger = recenterTrigger,
+                onFallbackToNative = { useStreetTilesMap = false },
                 onRunnerSelected = { /* runner clicked */ }
             )
         } else {
@@ -155,6 +174,7 @@ fun RealOutdoorArenaScreen(
                 pulseProgress = pulseProgress,
                 shockwaveAlpha = shockwaveAlpha,
                 shockwaveExpansionDp = shockwaveExpansionDp,
+                recenterTrigger = recenterTrigger,
                 modifier = Modifier.fillMaxSize()
             )
         }
@@ -183,7 +203,7 @@ fun RealOutdoorArenaScreen(
                     Icon(imageVector = Icons.Default.Pause, contentDescription = "Exit", tint = Color.White)
                 }
 
-                // Map Engine Switch (OpenStreetMap Tactical Tiles vs Tactical Radar)
+                // Map Engine Switch (Native Tactical Radar vs Web Street Tiles)
                 Surface(
                     onClick = { useStreetTilesMap = !useStreetTilesMap },
                     shape = RoundedCornerShape(14.dp),
@@ -202,7 +222,7 @@ fun RealOutdoorArenaScreen(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = if (useStreetTilesMap) "STREET MAP" else "RADAR",
+                            text = if (useStreetTilesMap) "STREET TILES" else "TACTICAL RADAR",
                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                             color = Color.White
                         )
@@ -216,15 +236,45 @@ fun RealOutdoorArenaScreen(
                     backgroundColor = DarkSurfaceGlass
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(imageVector = Icons.Default.AccessTime, contentDescription = null, tint = GoldAccent, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Icon(imageVector = Icons.Default.AccessTime, contentDescription = null, tint = GoldAccent, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = "%02d:%02d".format(remainingSeconds / 60, remainingSeconds % 60),
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black, letterSpacing = 1.sp),
                             color = Color.White
+                        )
+                    }
+                }
+
+                // 1:30 Mutual Radar Reveal Badge
+                Surface(
+                    onClick = { engine.triggerSonarPing() },
+                    shape = RoundedCornerShape(14.dp),
+                    color = if (radarRevealActive) NeonGreen.copy(alpha = 0.25f) else DarkSurfaceGlass,
+                    border = BorderStroke(1.2.dp, if (radarRevealActive) NeonGreen else ElectricBlue)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Sensors,
+                            contentDescription = "Radar Reveal",
+                            tint = if (radarRevealActive) NeonGreen else ElectricBlue,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (radarRevealActive) {
+                                "REVEAL: ${radarRevealSecondsLeft}s"
+                            } else {
+                                "PING: %02d:%02d".format(radarCountdown / 60, radarCountdown % 60)
+                            },
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black),
+                            color = if (radarRevealActive) NeonGreen else Color.White
                         )
                     }
                 }
@@ -325,7 +375,7 @@ fun RealOutdoorArenaScreen(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = if (isSeeker) "Seeker" else "Runner",
+                            text = if (isSeeker) "Seeker (Hunter)" else "Hider (Runner)",
                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Black),
                             color = if (isSeeker) NeonRed else ElectricBlue
                         )
@@ -545,7 +595,9 @@ fun RealOutdoorArenaScreen(
                         text = if (isInsideSafeZone) {
                             "INSIDE SAFE ZONE (%.0fm to edge)".format(-distToEdge)
                         } else {
-                            "DANGER: %.0fm OUT OF SAFE ZONE!".format(distToEdge)
+                            val edgeM = distToEdge.toInt()
+                            val formatted = if (edgeM >= 1000) "%.1fkm".format(edgeM / 1000f) else "${edgeM}m"
+                            "DANGER: $formatted OUT OF SAFE ZONE!"
                         },
                         style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                         color = if (isInsideSafeZone) Color.White else NeonRed

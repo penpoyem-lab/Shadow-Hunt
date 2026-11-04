@@ -49,6 +49,15 @@ class RealOutdoorGameEngine(
     private val _nearbyDistance = MutableStateFlow(999f)
     val nearbyDistance: StateFlow<Float> = _nearbyDistance.asStateFlow()
 
+    private val _radarCountdown = MutableStateFlow(90) // 1:30 minutes between pings
+    val radarCountdown: StateFlow<Int> = _radarCountdown.asStateFlow()
+
+    private val _radarRevealActive = MutableStateFlow(false)
+    val radarRevealActive: StateFlow<Boolean> = _radarRevealActive.asStateFlow()
+
+    private val _radarRevealSecondsLeft = MutableStateFlow(0)
+    val radarRevealSecondsLeft: StateFlow<Int> = _radarRevealSecondsLeft.asStateFlow()
+
     var roomSettings = LiveRoomSettings()
     private var engineScope: CoroutineScope? = null
     private var isRunning = false
@@ -62,14 +71,22 @@ class RealOutdoorGameEngine(
     ) {
         roomSettings = settings
         val currentLoc = locationManager.currentLocation.value
-        hasAnchoredToRealGps = (currentLoc != null)
-        val lat = currentLoc?.latitude ?: settings.centerLatitude
-        val lon = currentLoc?.longitude ?: settings.centerLongitude
+        val hasLoc = currentLoc != null && currentLoc.latitude != 0.0 && currentLoc.longitude != 0.0
+        hasAnchoredToRealGps = hasLoc
+        val lat = if (hasLoc) currentLoc!!.latitude else settings.centerLatitude
+        val lon = if (hasLoc) currentLoc!!.longitude else settings.centerLongitude
 
         settings.centerLatitude = lat
         settings.centerLongitude = lon
 
         val list = mutableListOf<RealGpsPlayer>()
+
+        val totalPlayers = 6
+        // Smart random role assignment: 1-2 seekers, remaining are hiders
+        val seekerCount = if (totalPlayers <= 4) 1 else 2
+        val randomSeekers = (0 until totalPlayers).shuffled(Random(System.currentTimeMillis())).take(seekerCount).toSet()
+
+        val myRole = if (randomSeekers.contains(0)) PlayerRole.SEEKER else PlayerRole.RUNNER
 
         // Local Player
         list.add(
@@ -77,7 +94,7 @@ class RealOutdoorGameEngine(
                 id = "p_local",
                 nickname = localNickname.ifEmpty { "Kishalay_007" },
                 avatarId = localAvatarId,
-                role = preferredRole,
+                role = myRole,
                 latitude = lat,
                 longitude = lon,
                 accuracyMeters = currentLoc?.accuracy ?: 5f,
@@ -91,16 +108,8 @@ class RealOutdoorGameEngine(
         val names = listOf("RexHunter", "ShadowKing", "Devil", "Valkyrie", "Ghost", "Cipher")
         val avatars = listOf("hunter", "cyber", "phantom", "reaper", "demon")
 
-        var seekersAssigned = if (preferredRole == PlayerRole.SEEKER) 1 else 0
-        val totalPlayers = 6
-
         for (i in 1 until totalPlayers) {
-            val role = if (seekersAssigned < 1) {
-                seekersAssigned++
-                PlayerRole.SEEKER
-            } else {
-                PlayerRole.RUNNER
-            }
+            val role = if (randomSeekers.contains(i)) PlayerRole.SEEKER else PlayerRole.RUNNER
 
             // Scatter within 80m - 200m radius of current GPS coordinates
             val angle = (i * 2.0 * Math.PI / (totalPlayers - 1))
@@ -142,6 +151,71 @@ class RealOutdoorGameEngine(
         _lastCapturedMugshot.value = null
     }
 
+    fun initializeRoomFromLobby(
+        settings: LiveRoomSettings,
+        lobbyPlayers: List<PlayerState>
+    ) {
+        roomSettings = settings
+        val currentLoc = locationManager.currentLocation.value
+        val hasLoc = currentLoc != null && currentLoc.latitude != 0.0 && currentLoc.longitude != 0.0
+        hasAnchoredToRealGps = hasLoc
+        val lat = if (hasLoc) currentLoc!!.latitude else settings.centerLatitude
+        val lon = if (hasLoc) currentLoc!!.longitude else settings.centerLongitude
+
+        settings.centerLatitude = lat
+        settings.centerLongitude = lon
+
+        val list = mutableListOf<RealGpsPlayer>()
+        val total = lobbyPlayers.size.coerceAtLeast(1)
+
+        // Smart random role assignment for all lobby players
+        val seekerCount = when {
+            total <= 4 -> 1
+            total <= 8 -> 2
+            else -> 3
+        }
+        val randomSeekers = (0 until total).shuffled(Random(System.currentTimeMillis())).take(seekerCount).toSet()
+
+        lobbyPlayers.forEachIndexed { index, p ->
+            val smartRole = if (randomSeekers.contains(index)) PlayerRole.SEEKER else PlayerRole.RUNNER
+            val angle = (index * 2.0 * Math.PI / total)
+            val distMeters = if (p.isLocalPlayer) 0.0 else (60.0 + Random.nextDouble(20.0, 110.0))
+            val dLat = (distMeters * Math.cos(angle)) / 111320.0
+            val dLon = (distMeters * Math.sin(angle)) / (111320.0 * Math.cos(Math.toRadians(lat)))
+
+            list.add(
+                RealGpsPlayer(
+                    id = p.id,
+                    nickname = p.nickname,
+                    avatarId = p.avatarId,
+                    role = smartRole,
+                    latitude = lat + dLat,
+                    longitude = lon + dLon,
+                    accuracyMeters = if (p.isLocalPlayer) (currentLoc?.accuracy ?: 5f) else 8f,
+                    isHost = p.isHost,
+                    isReady = p.isReady,
+                    isLocalPlayer = p.isLocalPlayer
+                )
+            )
+        }
+
+        _players.value = list
+        _safeZone.value = RealGpsSafeZone(
+            centerLatitude = lat,
+            centerLongitude = lon,
+            initialRadiusMeters = settings.initialRadiusMeters,
+            currentRadiusMeters = settings.initialRadiusMeters,
+            targetRadiusMeters = settings.initialRadiusMeters,
+            stage = 1,
+            totalStages = 5,
+            countdownSeconds = 45,
+            isShrinking = false
+        )
+        _remainingSeconds.value = settings.durationMinutes * 60
+        _gamePhase.value = GamePhase.PREPARATION
+        _lastCapturedMugshot.value = null
+    }
+
     fun startGame() {
         engineScope?.cancel()
         engineScope = CoroutineScope(Dispatchers.Default + Job())
@@ -157,7 +231,10 @@ class RealOutdoorGameEngine(
             soundEffects.playCountdownBeep(true)
             delay(1000)
             _gamePhase.value = GamePhase.SAFE_CALM
-            postAlert("RUN OR HUNT! Safe zone active in real life!")
+
+            val local = _players.value.find { it.isLocalPlayer }
+            val roleName = if (local?.role == PlayerRole.SEEKER) "SEEKER (HUNTER)" else "HIDER (RUNNER)"
+            postAlert("YOUR ROLE: $roleName! 1:30 Radar Reveal incoming!")
 
             launchLoops()
         }
@@ -172,9 +249,10 @@ class RealOutdoorGameEngine(
             }
         }
 
-        // Match Timer & Safe Zone Ticker (every 1s)
+        // Match Timer & Safe Zone Ticker (every 1s) with 1:30 min Radar Reveal
         launch {
-            var blinkTimer = 0
+            var blinkCounter = 90 // 1 minute 30 seconds
+            var activeRevealTime = 0
             while (isRunning && _gamePhase.value != GamePhase.GAME_OVER) {
                 delay(1000)
                 if (_remainingSeconds.value > 0) {
@@ -184,10 +262,29 @@ class RealOutdoorGameEngine(
                     break
                 }
 
-                blinkTimer++
-                if (blinkTimer >= roomSettings.hintBlinkSeconds) {
-                    blinkTimer = 0
-                    triggerGpsBlink()
+                if (activeRevealTime > 0) {
+                    activeRevealTime--
+                    _radarRevealSecondsLeft.value = activeRevealTime
+                    if (activeRevealTime == 0) {
+                        _sonarActive.value = false
+                        _radarRevealActive.value = false
+                        postAlert("Stealth restored: Radar offline!")
+                    }
+                } else {
+                    blinkCounter--
+                    _radarCountdown.value = blinkCounter
+                    if (blinkCounter <= 0) {
+                        blinkCounter = 90 // Reset to 1:30 min
+                        _radarCountdown.value = blinkCounter
+                        activeRevealTime = 15 // 15-second mutual reveal window
+                        _radarRevealSecondsLeft.value = activeRevealTime
+                        _radarRevealActive.value = true
+                        _sonarActive.value = true
+                        soundEffects.playSonarPing()
+                        postAlert("📡 1:30 RADAR REVEAL! Seekers & Hiders exposed (15s)!")
+                    } else if (blinkCounter == 10) {
+                        postAlert("⚠️ Radar Ping in 10s: Seekers & Hiders will be exposed!")
+                    }
                 }
 
                 updateSafeZoneClock()
@@ -245,9 +342,16 @@ class RealOutdoorGameEngine(
 
     private fun updateLocations() {
         val currentLoc = locationManager.currentLocation.value ?: return
+        if (currentLoc.latitude == 0.0 && currentLoc.longitude == 0.0) return
 
-        // If not yet anchored to true real GPS location, anchor the arena & runners now
-        if (!hasAnchoredToRealGps) {
+        val zoneCenterDist = LiveLocationManager.distanceMeters(
+            currentLoc.latitude, currentLoc.longitude,
+            _safeZone.value.centerLatitude, _safeZone.value.centerLongitude
+        )
+
+        // If not yet anchored to true real GPS location OR if safe zone is far (> 1200m) from player,
+        // automatically anchor the arena & runners right on the user's real location
+        if (!hasAnchoredToRealGps || zoneCenterDist > 1200f) {
             hasAnchoredToRealGps = true
             anchorGameToLocation(currentLoc.latitude, currentLoc.longitude)
             return
@@ -290,7 +394,8 @@ class RealOutdoorGameEngine(
         if (distToCenter > zone.currentRadiusMeters) {
             if (Random.nextFloat() < 0.15f) {
                 val outDist = (distToCenter - zone.currentRadiusMeters).toInt()
-                postAlert("DANGER: OUT OF SAFE ZONE by ${outDist}m!")
+                val formattedDist = if (outDist >= 1000) "%.1fkm".format(outDist / 1000f) else "${outDist}m"
+                postAlert("DANGER: OUT OF SAFE ZONE by $formattedDist!")
                 soundEffects.playZoneWarning()
             }
         }

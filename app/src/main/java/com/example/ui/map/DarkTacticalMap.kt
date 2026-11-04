@@ -2,34 +2,61 @@ package com.example.ui.map
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.location.LiveLocationManager
 import com.example.model.PlayerRole
 import com.example.model.RealGpsPlayer
 import com.example.model.RealGpsSafeZone
+import com.example.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 import kotlin.math.*
+
+enum class MapLayerType(val displayName: String, val shortName: String) {
+    TACTICAL_NEON("NEON TACTICAL", "TACTICAL"),
+    STREET("OPENSTREETMAP", "STREET"),
+    SATELLITE("SATELLITE", "SATELLITE"),
+    TERRAIN("TERRAIN", "TERRAIN")
+}
 
 object MapTileCache {
     val cache = ConcurrentHashMap<String, ImageBitmap>()
-    val httpClient = OkHttpClient.Builder().build()
+    val httpClient = OkHttpClient.Builder()
+        .connectTimeout(6, TimeUnit.SECONDS)
+        .readTimeout(8, TimeUnit.SECONDS)
+        .build()
 }
 
 @Composable
@@ -48,48 +75,71 @@ fun DarkTacticalMap(
     pulseProgress: Float,
     shockwaveAlpha: Float,
     shockwaveExpansionDp: androidx.compose.ui.unit.Dp,
+    recenterTrigger: Int = 0,
     modifier: Modifier = Modifier
 ) {
+    var selectedLayer by remember { mutableStateOf(MapLayerType.TACTICAL_NEON) }
     var zoomLevel by remember { mutableFloatStateOf(16.5f) }
     var panOffsetX by remember { mutableFloatStateOf(0f) }
     var panOffsetY by remember { mutableFloatStateOf(0f) }
 
     val coroutineScope = rememberCoroutineScope()
 
-    // Smoothly follow user when within default tracking
+    // Cyan glowing tactical color matrix for TACTICAL_NEON mode (Matches Screenshot 4)
+    val tacticalCyanMatrix = remember {
+        ColorMatrix(
+            floatArrayOf(
+                -1.4f, -1.4f, -1.4f, 0f, 255f, // Invert light land into dark slate
+                -0.3f,  1.1f,  0.5f, 0f,  45f, // Glowing cyan-green
+                 0.2f,  0.9f,  1.9f, 0f,  85f, // Electric blue-cyan streets
+                 0f,    0f,    0f,   1f,   0f
+            )
+        )
+    }
+    val tacticalColorFilter = remember { ColorFilter.colorMatrix(tacticalCyanMatrix) }
+
+    // Recenter camera onto user location
+    LaunchedEffect(recenterTrigger) {
+        if (recenterTrigger > 0) {
+            panOffsetX = 0f
+            panOffsetY = 0f
+            zoomLevel = 16.5f
+        }
+    }
+
+    // Auto-recenter smoothly if camera hasn't been panned manually
     LaunchedEffect(userLatitude, userLongitude) {
         if (abs(panOffsetX) < 1f && abs(panOffsetY) < 1f) {
-            // Keep centered
+            // Keep centered on player
         }
     }
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFF070811))
+            .background(Color(0xFF060A14))
             .pointerInput(Unit) {
                 detectTransformGestures { _, pan, zoom, _ ->
-                    zoomLevel = (zoomLevel * zoom).coerceIn(14f, 19f)
+                    zoomLevel = (zoomLevel * zoom).coerceIn(13.5f, 19.5f)
                     panOffsetX += pan.x
                     panOffsetY += pan.y
                 }
             }
     ) {
+        // 1. PRIMARY MAP CANVAS: ZERO-API-KEY TILES + GEOMETRY HUD
         Canvas(modifier = Modifier.fillMaxSize()) {
             val canvasW = size.width
             val canvasH = size.height
 
-            val viewCenterLat = userLatitude
-            val viewCenterLon = userLongitude
+            val viewCenterLat = if (userLatitude != 0.0) userLatitude else safeZone.centerLatitude
+            val viewCenterLon = if (userLongitude != 0.0) userLongitude else safeZone.centerLongitude
 
             val screenCenterX = canvasW / 2f + panOffsetX
             val screenCenterY = canvasH / 2f + panOffsetY
 
-            // Coordinate conversion helper: Lat/Lon -> Screen X/Y
+            // Flat-earth Mercator projection for local 5km gaming arena
             fun latLonToScreen(lat: Double, lon: Double): Offset {
                 val metersPerPixel = (156543.03 * cos(Math.toRadians(viewCenterLat)) / 2.0.pow(zoomLevel.toDouble())).toFloat()
-
-                // Approximate flat-earth projection for local game area (<5km)
                 val latDistanceMeters = ((lat - viewCenterLat) * 111320.0).toFloat()
                 val lonDistanceMeters = ((lon - viewCenterLon) * (111320.0 * cos(Math.toRadians(viewCenterLat)))).toFloat()
 
@@ -103,17 +153,20 @@ fun DarkTacticalMap(
                 return meters / metersPerPixel
             }
 
-            // 1. Draw Map Tiles (CartoDB Dark Matter / OSM)
-            val z = zoomLevel.toInt()
+            // Draw base dark tactical grid canvas background
+            drawRect(color = Color(0xFF060A14))
+
+            // RASTER TILE DOWNLOAD & DRAW ENGINE (OSM / ESRI Satellite / ESRI Topo)
+            val z = zoomLevel.toInt().coerceIn(12, 19)
             val centerTileX = lonToTileX(viewCenterLon, z)
             val centerTileY = latToTileY(viewCenterLat, z)
 
-            // Render a 4x4 tile grid around current view
+            // Render a wide 5x5 tile grid centered around viewport
             for (dx in -2..2) {
                 for (dy in -2..2) {
                     val tileX = centerTileX + dx
                     val tileY = centerTileY + dy
-                    val tileKey = "$z/$tileX/$tileY"
+                    val tileKey = "${selectedLayer.name}/$z/$tileX/$tileY"
 
                     val tileLon = tileXToLon(tileX, z)
                     val tileLat = tileYToLat(tileY, z)
@@ -130,27 +183,40 @@ fun DarkTacticalMap(
                         drawImage(
                             image = cached,
                             dstOffset = androidx.compose.ui.unit.IntOffset(topLeft.x.toInt(), topLeft.y.toInt()),
-                            dstSize = androidx.compose.ui.unit.IntSize(tileWidth.toInt(), tileHeight.toInt())
+                            dstSize = androidx.compose.ui.unit.IntSize(tileWidth.toInt() + 1, tileHeight.toInt() + 1),
+                            colorFilter = if (selectedLayer == MapLayerType.TACTICAL_NEON) tacticalColorFilter else null
                         )
                     } else {
-                        // Background placeholder grid tile
+                        // Cyberpunk placeholder grid cell with subtle coordinates
                         drawRect(
-                            color = Color(0xFF0B0D18),
+                            color = Color(0xFF090D1A),
                             topLeft = topLeft,
                             size = Size(tileWidth, tileHeight)
                         )
                         drawRect(
-                            color = Color(0x1500E5FF),
+                            color = Color(0x1800E5FF),
                             topLeft = topLeft,
                             size = Size(tileWidth, tileHeight),
                             style = Stroke(1f)
                         )
 
-                        // Request tile asynchronously
+                        // Asynchronous tile fetch from free, zero-key endpoints
                         coroutineScope.launch(Dispatchers.IO) {
                             try {
-                                val url = "https://a.basemaps.cartocdn.com/dark_all/$z/$tileX/$tileY.png"
-                                val req = Request.Builder().url(url).header("User-Agent", "ShadowHuntAndroid/1.0").build()
+                                val url = when (selectedLayer) {
+                                    MapLayerType.TACTICAL_NEON, MapLayerType.STREET ->
+                                        "https://tile.openstreetmap.org/$z/$tileX/$tileY.png"
+                                    MapLayerType.SATELLITE ->
+                                        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/$z/$tileY/$tileX"
+                                    MapLayerType.TERRAIN ->
+                                        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/$z/$tileY/$tileX"
+                                }
+
+                                val req = Request.Builder()
+                                    .url(url)
+                                    .header("User-Agent", "ShadowHuntGame/2.0 (Android; ZeroKeyTactical)")
+                                    .build()
+
                                 val resp = MapTileCache.httpClient.newCall(req).execute()
                                 if (resp.isSuccessful) {
                                     val bytes = resp.body?.bytes()
@@ -167,112 +233,151 @@ fun DarkTacticalMap(
                 }
             }
 
-            // 2. Real Shrinking Safe Zone Geofence Circle
+            // 2. CONCENTRIC DISTANCE RADAR RINGS (100m, 200m, 300m)
+            val userScreen = latLonToScreen(userLatitude, userLongitude)
+            listOf(100f, 200f, 300f).forEach { radiusMeters ->
+                val rPx = metersToPixels(radiusMeters)
+                drawCircle(
+                    color = Color(0x2200E5FF),
+                    radius = rPx,
+                    center = userScreen,
+                    style = Stroke(
+                        width = 1.dp.toPx(),
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f))
+                    )
+                )
+            }
+
+            // 3. GLOWING CYAN CIRCULAR SAFE ZONE (Exact aesthetic of Screenshot 4)
             val zoneCenterScreen = latLonToScreen(safeZone.centerLatitude, safeZone.centerLongitude)
             val baseRadiusPx = metersToPixels(safeZone.currentRadiusMeters)
-            val animatedRadiusPx = baseRadiusPx + breathingOffsetPx
+            val animatedRadiusPx = (baseRadiusPx + breathingOffsetPx).coerceAtLeast(10f)
 
-            // Outer Danger Zone Overlay
-            drawRect(color = Color(0x28FF1744))
+            // Outer danger tint outside zone
+            drawRect(color = Color(0x24FF1744))
 
-            // Inner Safe Zone Tint (Green/Cyan)
-            val safeAreaTint = if (urgencyLevel > 0.7f) Color(0x22FF1E43) else Color(0x1E00E676)
+            // Inner safe zone cyan aura
+            val safeAreaTint = if (urgencyLevel > 0.7f) Color(0x25FF1E43) else Color(0x2000E5FF)
             drawCircle(
                 color = safeAreaTint,
                 radius = animatedRadiusPx,
                 center = zoneCenterScreen
             )
 
-            // Expanding Shockwave Ring on Safe Zone Boundary
+            // Expanding shockwave pulse ring on boundary
             val shockwaveRadius = animatedRadiusPx + (shockwaveExpansionDp.toPx() * pulseProgress)
             val shockwaveColor = if (urgencyLevel > 0.5f) Color(0xFFFF1E43) else Color(0xFF00E5FF)
             drawCircle(
                 color = shockwaveColor.copy(alpha = shockwaveAlpha),
                 radius = shockwaveRadius,
                 center = zoneCenterScreen,
-                style = Stroke(width = (2.5f + urgencyLevel * 2f).dp.toPx())
+                style = Stroke(width = (3.dp).toPx())
             )
 
-            // Main Pulsing Perimeter Ring
-            val ringColors = if (urgencyLevel > 0.6f) {
-                listOf(Color(0xFFFF1E43), Color(0xFFFFD700), Color(0xFFFF1E43))
-            } else {
-                listOf(Color(0xFF00E5FF), Color(0xFF00E676), Color(0xFF00E5FF))
-            }
-
+            // Neon Glowing Perimeter Ring (Thick cyan border matching Screenshot 4)
+            val glowColor = if (urgencyLevel > 0.6f) Color(0xFFFF1E43) else Color(0xFF00E5FF)
+            // Outer soft bloom
             drawCircle(
-                brush = Brush.sweepGradient(ringColors, zoneCenterScreen),
+                color = glowColor.copy(alpha = 0.45f),
+                radius = animatedRadiusPx + 3.dp.toPx(),
+                center = zoneCenterScreen,
+                style = Stroke(width = 7.dp.toPx())
+            )
+            // Intense core ring
+            drawCircle(
+                color = glowColor,
                 radius = animatedRadiusPx,
                 center = zoneCenterScreen,
-                style = Stroke(width = (3.5f + urgencyLevel * 2.5f).dp.toPx())
+                style = Stroke(width = 3.5.dp.toPx())
             )
 
-            // Dashed Warning Ring when Shrinking
+            // Dashed urgency ring when zone is shrinking
             if (safeZone.isShrinking || urgencyLevel > 0.6f) {
                 drawCircle(
-                    color = Color(0xFFFF1E43).copy(alpha = 0.85f),
-                    radius = animatedRadiusPx + 6.dp.toPx(),
+                    color = Color(0xFFFFD700),
+                    radius = animatedRadiusPx + 8.dp.toPx(),
                     center = zoneCenterScreen,
                     style = Stroke(
                         width = 2.dp.toPx(),
-                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(14f, 10f), pulseProgress * 24f)
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 8f), pulseProgress * 20f)
                     )
                 )
             }
 
-            // 3. Render Players on Live Map
+            // 4. PLAYER MARKERS (Green runners inside, red hunters/seekers, matching Screenshot 4)
             players.forEach { player ->
-                if (!player.isTagged) {
+                if (!player.isTagged && !player.isLocalPlayer) {
                     val pScreen = latLonToScreen(player.latitude, player.longitude)
 
                     if (player.role == PlayerRole.SEEKER) {
-                        // SEEKER: Menacing Red Marker + 20-Meter Capture Halo
-                        val captureHaloRadiusPx = metersToPixels(20f)
-                        drawCircle(
-                            color = Color(0x33FF1E43),
-                            radius = captureHaloRadiusPx,
-                            center = pScreen
-                        )
-                        drawCircle(
-                            color = Color(0x88FF1E43),
-                            radius = captureHaloRadiusPx,
-                            center = pScreen,
-                            style = Stroke(width = 1.2.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f)))
-                        )
-                        drawCircle(
-                            color = Color(0xFFFF1E43),
-                            radius = 12.dp.toPx(),
-                            center = pScreen
-                        )
-                        drawCircle(
-                            color = Color.White,
-                            radius = 4.dp.toPx(),
-                            center = pScreen
-                        )
-                    } else {
-                        // RUNNER: Cyan Marker (Revealed during Sonar GPS Blink or for local player)
-                        val isVisible = player.isLocalPlayer || sonarActive || !isSeeker
-                        if (isVisible) {
+                        // Seeker/Hunter: Visible to Hiders during 1:30 radar reveal (sonarActive) OR if seeker is nearby (< 35m) OR if local player is also seeker
+                        val distToLocal = LiveLocationManager.distanceMeters(userLatitude, userLongitude, player.latitude, player.longitude)
+                        val isSeekerVisible = isSeeker || sonarActive || distToLocal <= 35f
+
+                        if (isSeekerVisible) {
+                            val captureHaloRadiusPx = metersToPixels(20f)
                             drawCircle(
-                                color = Color(0x4400E5FF),
+                                color = Color(0x35FF1E43),
+                                radius = captureHaloRadiusPx,
+                                center = pScreen
+                            )
+                            drawCircle(
+                                color = Color(0xFFFF1E43),
+                                radius = captureHaloRadiusPx,
+                                center = pScreen,
+                                style = Stroke(width = 1.2.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 6f)))
+                            )
+                            // Red pin marker
+                            drawCircle(
+                                color = Color(0x55FF1E43),
                                 radius = 16.dp.toPx(),
                                 center = pScreen
                             )
                             drawCircle(
-                                color = Color(0xFF00E5FF),
+                                color = Color(0xFFFF1744),
                                 radius = 10.dp.toPx(),
                                 center = pScreen
                             )
                             drawCircle(
                                 color = Color.White,
-                                radius = 3.dp.toPx(),
+                                radius = 3.5.dp.toPx(),
                                 center = pScreen
                             )
                         } else {
-                            // Faint blip
+                            // Faint danger blip if seeker is within 70m
+                            if (distToLocal <= 70f) {
+                                drawCircle(
+                                    color = Color(0x22FF1744),
+                                    radius = 6.dp.toPx(),
+                                    center = pScreen
+                                )
+                            }
+                        }
+                    } else {
+                        // Runner/Hider: Visible to Seekers during 1:30 radar reveal (sonarActive) OR if local player is also runner
+                        val isRunnerVisible = sonarActive || !isSeeker || player.lastBlinkVisible
+                        if (isRunnerVisible) {
+                            // Green glowing pin
                             drawCircle(
-                                color = Color(0x2200E5FF),
-                                radius = 6.dp.toPx(),
+                                color = Color(0x4400E676),
+                                radius = 16.dp.toPx(),
+                                center = pScreen
+                            )
+                            drawCircle(
+                                color = Color(0xFF00E676),
+                                radius = 10.dp.toPx(),
+                                center = pScreen
+                            )
+                            drawCircle(
+                                color = Color.White,
+                                radius = 3.5.dp.toPx(),
+                                center = pScreen
+                            )
+                        } else {
+                            // Faint ghost blip during stealth phase
+                            drawCircle(
+                                color = Color(0x1800E5FF),
+                                radius = 5.dp.toPx(),
                                 center = pScreen
                             )
                         }
@@ -280,35 +385,158 @@ fun DarkTacticalMap(
                 }
             }
 
-            // 4. Local User Location Crosshair & Compass Heading
-            val userScreen = latLonToScreen(userLatitude, userLongitude)
+            // Active 1:30 Radar Reveal Sweep Wave Animation
+            if (sonarActive) {
+                val sweepRadius = metersToPixels(350f * pulseProgress)
+                drawCircle(
+                    color = Color(0x5500E5FF),
+                    radius = sweepRadius,
+                    center = userScreen,
+                    style = Stroke(width = 2.5.dp.toPx())
+                )
+                drawCircle(
+                    color = Color(0x1000E5FF),
+                    radius = sweepRadius,
+                    center = userScreen
+                )
+            }
+
+            // 5. CENTRAL USER MARKER (Bright Yellow Glowing Dot + Heading Beam, Screenshot 4)
+            // Outer golden aura
             drawCircle(
-                color = Color(0x33FFD700),
-                radius = 20.dp.toPx(),
+                color = Color(0x44FFEA00),
+                radius = 22.dp.toPx(),
                 center = userScreen
             )
+            // Intermediate yellow glow
             drawCircle(
-                color = Color.Yellow,
+                color = Color(0x88FFEA00),
+                radius = 14.dp.toPx(),
+                center = userScreen
+            )
+            // Bright solid yellow core
+            drawCircle(
+                color = Color(0xFFFFEA00),
                 radius = 8.dp.toPx(),
                 center = userScreen
             )
+            // White center reflection
             drawCircle(
                 color = Color.White,
                 radius = 3.dp.toPx(),
                 center = userScreen
             )
 
-            // Heading indicator cone
+            // Compass heading ray
             val rad = Math.toRadians((userBearing - 90).toDouble())
-            val coneLength = 26.dp.toPx()
+            val coneLength = 32.dp.toPx()
             val tipX = userScreen.x + cos(rad).toFloat() * coneLength
             val tipY = userScreen.y + sin(rad).toFloat() * coneLength
             drawLine(
-                color = Color.Yellow,
+                color = Color(0xFFFFEA00),
                 start = userScreen,
                 end = Offset(tipX, tipY),
-                strokeWidth = 2.5.dp.toPx()
+                strokeWidth = 3.dp.toPx(),
+                cap = StrokeCap.Round
             )
+        }
+
+        // 2. TOP LAYER SELECTOR HUD PILL (TACTICAL, STREET, SATELLITE, TERRAIN)
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
+                .padding(top = 58.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(Color(0xDD090D18))
+                .border(1.dp, Color(0xFF232A42), RoundedCornerShape(20.dp))
+                .padding(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            MapLayerType.values().forEach { layer ->
+                val isSelected = selectedLayer == layer
+                Surface(
+                    onClick = { selectedLayer = layer },
+                    shape = RoundedCornerShape(16.dp),
+                    color = if (isSelected) ElectricBlue else Color.Transparent
+                ) {
+                    Text(
+                        text = layer.shortName,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold,
+                            fontSize = 10.sp,
+                            letterSpacing = 0.5.sp
+                        ),
+                        color = if (isSelected) Color.Black else Color(0xFFB0B7C3),
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
+                    )
+                }
+            }
+        }
+
+        // 3. FLOATING ON-MAP CONTROLS (Compass, Zoom In/Out)
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 16.dp, bottom = 120.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Compass Rose Widget
+            Surface(
+                onClick = { panOffsetX = 0f; panOffsetY = 0f },
+                shape = CircleShape,
+                color = Color(0xEE090D18),
+                border = BorderStroke(1.5.dp, ElectricBlue),
+                modifier = Modifier.size(44.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Navigation,
+                        contentDescription = "Compass",
+                        tint = NeonRed,
+                        modifier = Modifier
+                            .size(22.dp)
+                            .rotate(userBearing)
+                    )
+                }
+            }
+
+            // Zoom In (+) Button
+            Surface(
+                onClick = { zoomLevel = (zoomLevel + 0.6f).coerceAtMost(19.5f) },
+                shape = CircleShape,
+                color = Color(0xEE090D18),
+                border = BorderStroke(1.5.dp, Color(0xFF28324E)),
+                modifier = Modifier.size(44.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Zoom In",
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+
+            // Zoom Out (-) Button
+            Surface(
+                onClick = { zoomLevel = (zoomLevel - 0.6f).coerceAtMost(19.5f).coerceAtLeast(13.5f) },
+                shape = CircleShape,
+                color = Color(0xEE090D18),
+                border = BorderStroke(1.5.dp, Color(0xFF28324E)),
+                modifier = Modifier.size(44.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Remove,
+                        contentDescription = "Zoom Out",
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
         }
     }
 }

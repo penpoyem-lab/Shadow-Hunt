@@ -50,6 +50,6 @@ data class LiveRoomSettings(
     val initialRadiusMeters: Float = 400f,
     val durationMinutes: Int = 10,
     val shrinkSpeed: String = "Normal",
-    val hintBlinkSeconds: Int = 30,
+    val hintBlinkSeconds: Int = 90, // Exactly 1:30 minutes between radar pings
     val isSnowballMode: Boolean = true
 )

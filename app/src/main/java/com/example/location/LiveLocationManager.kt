@@ -89,11 +89,26 @@ class LiveLocationManager(private val context: Context) {
         }
     }
 
+    fun getLastKnownLocation(): Location? {
+        return _currentLocation.value
+    }
+
     companion object {
         fun distanceMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Float {
+            if (lat1.isNaN() || lon1.isNaN() || lat2.isNaN() || lon2.isNaN()) return 0f
+            if (lat1.isInfinite() || lon1.isInfinite() || lat2.isInfinite() || lon2.isInfinite()) return 0f
+            if (lat1 < -90.0 || lat1 > 90.0 || lat2 < -90.0 || lat2 > 90.0) return 0f
+            if (lon1 < -180.0 || lon1 > 180.0 || lon2 < -180.0 || lon2 > 180.0) return 0f
+            // If either point is uninitialized (0.0, 0.0), distance is 0 to prevent runaway 173990m errors
+            if ((lat1 == 0.0 && lon1 == 0.0) || (lat2 == 0.0 && lon2 == 0.0)) return 0f
+
             val results = FloatArray(1)
-            Location.distanceBetween(lat1, lon1, lat2, lon2, results)
-            return results[0]
+            try {
+                Location.distanceBetween(lat1, lon1, lat2, lon2, results)
+                return results[0]
+            } catch (_: Exception) {
+                return 0f
+            }
         }
 
         fun bearingDegrees(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Float {

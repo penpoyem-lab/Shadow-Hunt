@@ -40,6 +40,14 @@ fun LobbyScreen(
     val context = LocalContext.current
     var isStartingCountdown by remember { mutableStateOf(false) }
     var countdownSec by remember { mutableIntStateOf(5) }
+    var showRoomQrDialog by remember { mutableStateOf(false) }
+
+    if (showRoomQrDialog) {
+        com.example.ui.components.RoomQrCodeDialog(
+            roomCode = roomConfig.code,
+            onDismiss = { showRoomQrDialog = false }
+        )
+    }
 
     LaunchedEffect(isStartingCountdown) {
         if (isStartingCountdown) {
@@ -209,9 +217,7 @@ fun LobbyScreen(
                         }
 
                         Button(
-                            onClick = {
-                                Toast.makeText(context, "Room QR Code: ${roomConfig.code}", Toast.LENGTH_SHORT).show()
-                            },
+                            onClick = { showRoomQrDialog = true },
                             modifier = Modifier
                                 .weight(1f)
                                 .height(44.dp),

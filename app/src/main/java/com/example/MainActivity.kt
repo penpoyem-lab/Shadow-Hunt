@@ -150,13 +150,18 @@ fun ShadowHuntApp(
                 perms[Manifest.permission.ACCESS_COARSE_LOCATION] == true
         locationManager.updatePermission(locGranted)
 
-        // Launch real outdoor game
-        outdoorEngine.initializeRoom(
-            activeOutdoorSettings,
-            userProfile.nickname,
-            userProfile.avatarId,
-            PlayerRole.SEEKER
-        )
+        // Launch real outdoor game with all members from the room!
+        val lobbySquad = engine.players.value
+        if (lobbySquad.isNotEmpty()) {
+            outdoorEngine.initializeRoomFromLobby(activeOutdoorSettings, lobbySquad)
+        } else {
+            outdoorEngine.initializeRoom(
+                activeOutdoorSettings,
+                userProfile.nickname,
+                userProfile.avatarId,
+                PlayerRole.SEEKER
+            )
+        }
         outdoorEngine.startGame()
         currentScreen = Screen.OutdoorArena
     }
@@ -287,13 +292,8 @@ fun ShadowHuntApp(
                             initialRadiusMeters = 400f,
                             shrinkSpeed = config.shrinkSpeed
                         )
-                        permissionLauncher.launch(
-                            arrayOf(
-                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                Manifest.permission.ACCESS_COARSE_LOCATION,
-                                Manifest.permission.CAMERA
-                            )
-                        )
+                        engine.initializeRoom(config, nickname, avatarId)
+                        currentScreen = Screen.Lobby
                     }
                 )
             }
@@ -305,17 +305,15 @@ fun ShadowHuntApp(
                     onJoinGame = { code, nickname, avatarId ->
                         soundEffects.playClick()
                         userProfile = userProfile.copy(nickname = nickname, avatarId = avatarId)
+                        val joinedConfig = RoomConfig(code = code, name = "Private Room $code")
+                        activeRoomConfig = joinedConfig
+                        hasActiveRoom = true
                         activeOutdoorSettings = LiveRoomSettings(
                             roomCode = code,
                             roomName = "Live Room $code"
                         )
-                        permissionLauncher.launch(
-                            arrayOf(
-                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                Manifest.permission.ACCESS_COARSE_LOCATION,
-                                Manifest.permission.CAMERA
-                            )
-                        )
+                        engine.initializeRoom(joinedConfig, nickname, avatarId)
+                        currentScreen = Screen.Lobby
                     }
                 )
             }

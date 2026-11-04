@@ -116,8 +116,17 @@ class ShadowHuntEngine(
         currentRoomConfig = config
         val initialPlayers = mutableListOf<PlayerState>()
 
+        val totalToCreate = config.maxPlayers.coerceIn(2, 10)
+        // Smart random role assignment: 1 seeker for <= 4 players, 2 for 5-8 players, 3 for 9-10
+        val seekerCount = when {
+            totalToCreate <= 4 -> 1
+            totalToCreate <= 8 -> 2
+            else -> 3
+        }
+        val randomSeekerIndices = (0 until totalToCreate).shuffled(Random(System.currentTimeMillis())).take(seekerCount).toSet()
+
         // Local Player
-        val assignedRole = preferredRole ?: if (config.seekersCount > 0 && Random.nextFloat() < 0.35f) PlayerRole.SEEKER else PlayerRole.RUNNER
+        val assignedRole = preferredRole ?: if (randomSeekerIndices.contains(0)) PlayerRole.SEEKER else PlayerRole.RUNNER
         initialPlayers.add(
             PlayerState(
                 id = "p_local",
@@ -137,16 +146,8 @@ class ShadowHuntEngine(
         val botNames = listOf("RexHunter", "ShadowKing", "Devil", "Valkyrie", "Ghost", "Cipher", "Phoenix", "Specter", "Zero")
         val botAvatars = listOf("hunter", "cyber", "phantom", "reaper", "demon")
 
-        var seekersAssigned = if (assignedRole == PlayerRole.SEEKER) 1 else 0
-        val totalToCreate = config.maxPlayers.coerceIn(2, 10)
-
         for (i in 1 until totalToCreate) {
-            val role = if (seekersAssigned < config.seekersCount) {
-                seekersAssigned++
-                PlayerRole.SEEKER
-            } else {
-                PlayerRole.RUNNER
-            }
+            val role = if (randomSeekerIndices.contains(i)) PlayerRole.SEEKER else PlayerRole.RUNNER
 
             val spawnAngle = (i * 2 * PI / (totalToCreate - 1)).toFloat()
             val spawnDist = Random.nextFloat() * 200f + 120f

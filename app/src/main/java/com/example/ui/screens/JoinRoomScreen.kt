@@ -32,6 +32,17 @@ fun JoinRoomScreen(
     var selectedAvatarId by remember { mutableStateOf(initialAvatarId) }
     var roomCode by remember { mutableStateOf("SH7KQ2") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var showScannerDialog by remember { mutableStateOf(false) }
+
+    if (showScannerDialog) {
+        com.example.ui.components.QrScannerDialog(
+            onCodeScanned = { scanned ->
+                roomCode = scanned
+                showScannerDialog = false
+            },
+            onDismiss = { showScannerDialog = false }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -226,7 +237,7 @@ fun JoinRoomScreen(
                 )
                 Spacer(modifier = Modifier.width(10.dp))
                 IconButton(
-                    onClick = { roomCode = "SH7KQ2" }, // Quick demo fill
+                    onClick = { showScannerDialog = true },
                     modifier = Modifier
                         .size(54.dp)
                         .clip(RoundedCornerShape(14.dp))
@@ -272,9 +283,7 @@ fun JoinRoomScreen(
 
             // SCAN INVITE QR BUTTON
             OutlinedButton(
-                onClick = {
-                    roomCode = "SH" + (1000..9999).random().toString()
-                },
+                onClick = { showScannerDialog = true },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),

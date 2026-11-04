@@ -58,6 +58,7 @@ fun MapLibreMapView(
     runners: List<RealGpsPlayer> = emptyList(),
     isRadarPulseActive: Boolean = false,
     recenterTrigger: Int = 0,
+    onFallbackToNative: () -> Unit = {},
     onRunnerSelected: (RealGpsPlayer) -> Unit = {}
 ) {
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
@@ -102,7 +103,10 @@ fun MapLibreMapView(
                     }
 
                     override fun onRenderProcessGone(view: WebView?, detail: android.webkit.RenderProcessGoneDetail?): Boolean {
-                        // Prevent renderer crash from terminating app
+                        try {
+                            view?.destroy()
+                        } catch (_: Exception) {}
+                        onFallbackToNative()
                         return true
                     }
                 }
