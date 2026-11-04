@@ -243,6 +243,12 @@
       }
     }
 
+    function centerOnPlayer() {
+      if (map && playerMarker) {
+        map.setView(playerMarker.getLatLng(), 18, { animate: true });
+      }
+    }
+
     function updateSafeZone(lat, lng, radiusMeters, phaseName) {
       if (!map) return;
       if (safeZoneCircle) {

@@ -134,11 +134,29 @@
       return ret;
     }
 
+    function hasWebGL() {
+      try {
+        var canvas = document.createElement('canvas');
+        var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        return Boolean(gl && gl.getParameter);
+      } catch (e) {
+        return false;
+      }
+    }
+
     function initMapLibre(initialLat, initialLng, initialZoom) {
       var lat = initialLat || 37.7749;
       var lng = initialLng || -122.4194;
       userCoords = [lng, lat];
       safeZoneCenter = [lng, lat];
+
+      if (!hasWebGL()) {
+        console.warn('WebGL not supported on this renderer - showing fallback HUD');
+        if (window.AndroidBridge && window.AndroidBridge.onMapReady) {
+          window.AndroidBridge.onMapReady();
+        }
+        return;
+      }
 
       // Fetch the dark tactical tileset JSON style
       fetch('dark_tactical_tileset.json')
@@ -156,64 +174,82 @@
     }
 
     function loadMapWithStyle(styleJson, lat, lng, zoom) {
-      map = new maplibregl.Map({
-        container: 'map',
-        style: styleJson,
-        center: [lng, lat],
-        zoom: zoom,
-        pitch: 35, // Cyberpunk tilted tactical angle
-        bearing: -10,
-        attributionControl: false
-      });
+      try {
+        map = new maplibregl.Map({
+          container: 'map',
+          style: styleJson,
+          center: [lng, lat],
+          zoom: zoom,
+          pitch: 0,
+          bearing: 0,
+          attributionControl: false
+        });
 
-      map.on('load', function() {
-        setupMapLayers();
+        map.on('load', function() {
+          setupMapLayers();
+          if (window.AndroidBridge && window.AndroidBridge.onMapReady) {
+            window.AndroidBridge.onMapReady();
+          }
+        });
+
+        map.on('error', function(e) {
+          console.warn('MapLibre internal error:', e);
+        });
+      } catch (err) {
+        console.error('Failed to instantiate MapLibre:', err);
         if (window.AndroidBridge && window.AndroidBridge.onMapReady) {
           window.AndroidBridge.onMapReady();
         }
-      });
+      }
     }
 
     function loadFallbackStyle(lat, lng, zoom) {
-      map = new maplibregl.Map({
-        container: 'map',
-        style: {
-          version: 8,
-          sources: {
-            'osm-raster': {
-              type: 'raster',
-              tiles: ['https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'],
-              tileSize: 256
+      try {
+        map = new maplibregl.Map({
+          container: 'map',
+          style: {
+            version: 8,
+            sources: {
+              'osm-raster': {
+                type: 'raster',
+                tiles: ['https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'],
+                tileSize: 256
+              },
+              'safe-zone-source': {
+                type: 'geojson',
+                data: { type: 'FeatureCollection', features: [] }
+              },
+              'players-source': {
+                type: 'geojson',
+                data: { type: 'FeatureCollection', features: [] }
+              }
             },
-            'safe-zone-source': {
-              type: 'geojson',
-              data: { type: 'FeatureCollection', features: [] }
-            },
-            'players-source': {
-              type: 'geojson',
-              data: { type: 'FeatureCollection', features: [] }
-            }
+            layers: [
+              { id: 'bg', type: 'background', paint: { 'background-color': '#070a13' } },
+              { id: 'osm', type: 'raster', source: 'osm-raster', paint: { 'raster-contrast': 0.3 } },
+              { id: 'safe-fill', type: 'fill', source: 'safe-zone-source', paint: { 'fill-color': '#ff1744', 'fill-opacity': 0.09 } },
+              { id: 'safe-line', type: 'line', source: 'safe-zone-source', paint: { 'line-color': '#ff1744', 'line-width': 3 } },
+              { id: 'runners-pts', type: 'circle', source: 'players-source', paint: { 'circle-radius': 9, 'circle-color': '#00e5ff', 'circle-stroke-width': 2, 'circle-stroke-color': '#fff' } }
+            ]
           },
-          layers: [
-            { id: 'bg', type: 'background', paint: { 'background-color': '#070a13' } },
-            { id: 'osm', type: 'raster', source: 'osm-raster', paint: { 'raster-contrast': 0.3 } },
-            { id: 'safe-fill', type: 'fill', source: 'safe-zone-source', paint: { 'fill-color': '#ff1744', 'fill-opacity': 0.09 } },
-            { id: 'safe-line', type: 'line', source: 'safe-zone-source', paint: { 'line-color': '#ff1744', 'line-width': 3 } },
-            { id: 'runners-pts', type: 'circle', source: 'players-source', paint: { 'circle-radius': 9, 'circle-color': '#00e5ff', 'circle-stroke-width': 2, 'circle-stroke-color': '#fff' } }
-          ]
-        },
-        center: [lng, lat],
-        zoom: zoom,
-        pitch: 35,
-        attributionControl: false
-      });
+          center: [lng, lat],
+          zoom: zoom,
+          pitch: 0,
+          attributionControl: false
+        });
 
-      map.on('load', function() {
-        setupMapLayers();
+        map.on('load', function() {
+          setupMapLayers();
+          if (window.AndroidBridge && window.AndroidBridge.onMapReady) {
+            window.AndroidBridge.onMapReady();
+          }
+        });
+      } catch (e) {
+        console.error('Fallback style also failed:', e);
         if (window.AndroidBridge && window.AndroidBridge.onMapReady) {
           window.AndroidBridge.onMapReady();
         }
-      });
+      }
     }
 
     function setupMapLayers() {

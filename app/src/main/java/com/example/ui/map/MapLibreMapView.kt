@@ -81,8 +81,6 @@ fun MapLibreMapView(
         modifier = modifier.fillMaxSize(),
         factory = { context ->
             WebView(context).apply {
-                // Enable hardware acceleration for MapLibre WebGL vector tile rendering
-                setLayerType(View.LAYER_TYPE_HARDWARE, null)
                 setBackgroundColor(Color.parseColor("#070A13"))
 
                 settings.apply {
@@ -90,6 +88,8 @@ fun MapLibreMapView(
                     domStorageEnabled = true
                     allowFileAccess = true
                     allowContentAccess = true
+                    allowFileAccessFromFileURLs = true
+                    allowUniversalAccessFromFileURLs = true
                     cacheMode = WebSettings.LOAD_DEFAULT
                     useWideViewPort = true
                     loadWithOverviewMode = true
@@ -99,6 +99,11 @@ fun MapLibreMapView(
                 webViewClient = object : WebViewClient() {
                     override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                         return false
+                    }
+
+                    override fun onRenderProcessGone(view: WebView?, detail: android.webkit.RenderProcessGoneDetail?): Boolean {
+                        // Prevent renderer crash from terminating app
+                        return true
                     }
                 }
 

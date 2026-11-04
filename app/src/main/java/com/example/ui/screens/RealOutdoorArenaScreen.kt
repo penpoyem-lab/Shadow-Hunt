@@ -60,7 +60,7 @@ fun RealOutdoorArenaScreen(
 
     var miniMapMode by remember { mutableStateOf(MiniMapDisplayMode.CORNER) }
     var isCameraActive by remember { mutableStateOf(false) }
-    var useMapLibreMap by remember { mutableStateOf(true) }
+    var useStreetTilesMap by remember { mutableStateOf(true) }
     var recenterTrigger by remember { mutableStateOf(0) }
 
     // Pulsing Urgency Animation synchronized with timer
@@ -125,9 +125,9 @@ fun RealOutdoorArenaScreen(
             .fillMaxSize()
             .background(DarkBackground)
     ) {
-        // 1. DUAL MAP ENGINE: OPENSTREETMAP MAPLIBRE TACTICAL TILES OR NATIVE CANVAS RADAR
-        if (useMapLibreMap) {
-            MapLibreMapView(
+        // 1. DUAL MAP ENGINE: OPENSTREETMAP TACTICAL TILES OR NATIVE CANVAS RADAR
+        if (useStreetTilesMap) {
+            LeafletMapView(
                 modifier = Modifier.fillMaxSize(),
                 userLatitude = userLat,
                 userLongitude = userLon,
@@ -183,26 +183,26 @@ fun RealOutdoorArenaScreen(
                     Icon(imageVector = Icons.Default.Pause, contentDescription = "Exit", tint = Color.White)
                 }
 
-                // Map Engine Switch (MapLibre Tactical vs Radar)
+                // Map Engine Switch (OpenStreetMap Tactical Tiles vs Tactical Radar)
                 Surface(
-                    onClick = { useMapLibreMap = !useMapLibreMap },
+                    onClick = { useStreetTilesMap = !useStreetTilesMap },
                     shape = RoundedCornerShape(14.dp),
-                    color = if (useMapLibreMap) ElectricBlue.copy(alpha = 0.25f) else DarkSurfaceGlass,
-                    border = BorderStroke(1.dp, if (useMapLibreMap) ElectricBlue else DarkCardBorder)
+                    color = if (useStreetTilesMap) ElectricBlue.copy(alpha = 0.25f) else DarkSurfaceGlass,
+                    border = BorderStroke(1.dp, if (useStreetTilesMap) ElectricBlue else DarkCardBorder)
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            imageVector = if (useMapLibreMap) Icons.Default.Map else Icons.Default.Radar,
+                            imageVector = if (useStreetTilesMap) Icons.Default.Map else Icons.Default.Radar,
                             contentDescription = "Map Mode",
-                            tint = if (useMapLibreMap) ElectricBlue else NeonRed,
+                            tint = if (useStreetTilesMap) ElectricBlue else NeonRed,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = if (useMapLibreMap) "MAPLIBRE" else "RADAR",
+                            text = if (useStreetTilesMap) "STREET MAP" else "RADAR",
                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                             color = Color.White
                         )

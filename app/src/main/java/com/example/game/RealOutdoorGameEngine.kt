@@ -358,6 +358,10 @@ class RealOutdoorGameEngine(
         _safeZone.value = zone.copy()
     }
 
+    fun triggerSonarPing() {
+        triggerGpsBlink()
+    }
+
     private fun triggerGpsBlink() {
         _sonarActive.value = true
         soundEffects.playSonarPing()

@@ -21,6 +21,8 @@ import com.example.model.PlayerRole
 import com.example.model.RealGpsPlayer
 import com.example.model.RealGpsSafeZone
 
+import android.webkit.RenderProcessGoneDetail
+
 /**
  * JavaScript interface for two-way communication between Leaflet map and Compose.
  */
@@ -54,6 +56,7 @@ fun LeafletMapView(
     safeZone: RealGpsSafeZone,
     runners: List<RealGpsPlayer> = emptyList(),
     isRadarPulseActive: Boolean = false,
+    recenterTrigger: Int = 0,
     onRunnerSelected: (RealGpsPlayer) -> Unit = {}
 ) {
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
@@ -82,6 +85,8 @@ fun LeafletMapView(
                     javaScriptEnabled = true
                     domStorageEnabled = true
                     allowFileAccess = true
+                    allowFileAccessFromFileURLs = true
+                    allowUniversalAccessFromFileURLs = true
                     cacheMode = WebSettings.LOAD_DEFAULT
                     useWideViewPort = true
                     loadWithOverviewMode = true
@@ -89,6 +94,11 @@ fun LeafletMapView(
                 webViewClient = object : WebViewClient() {
                     override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                         return false
+                    }
+
+                    override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
+                        // Crucial fix: prevents chromium crash from killing the host activity
+                        return true
                     }
                 }
                 addJavascriptInterface(jsBridge, "AndroidBridge")
@@ -159,6 +169,13 @@ fun LeafletMapView(
     LaunchedEffect(isRadarPulseActive) {
         if (isRadarPulseActive && isMapInitialized && webViewRef != null) {
             webViewRef?.evaluateJavascript("javascript:if(window.triggerRadarPulse) window.triggerRadarPulse();", null)
+        }
+    }
+
+    // Trigger map camera re-centering on player GPS location
+    LaunchedEffect(recenterTrigger) {
+        if (recenterTrigger > 0 && isMapInitialized && webViewRef != null) {
+            webViewRef?.evaluateJavascript("javascript:if(window.centerOnPlayer) window.centerOnPlayer();", null)
         }
     }
 
