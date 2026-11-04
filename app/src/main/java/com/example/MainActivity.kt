@@ -43,6 +43,7 @@ import com.example.ui.screens.*
 import com.example.ui.theme.*
 
 sealed class Screen {
+    object Login : Screen()
     object Home : Screen()
     object CreateRoom : Screen()
     object JoinRoom : Screen()
@@ -106,7 +107,7 @@ fun ShadowHuntApp(
     soundEffects: GameSoundEffects
 ) {
     val context = LocalContext.current
-    var currentScreen by remember { mutableStateOf<Screen>(Screen.Home) }
+    var currentScreen by remember { mutableStateOf<Screen>(Screen.Login) }
     var selectedTab by remember { mutableStateOf(NavigationTab.HOME) }
     var showSettingsDialog by remember { mutableStateOf(false) }
 
@@ -130,8 +131,8 @@ fun ShadowHuntApp(
     }
 
     var activeRoomConfig by remember { mutableStateOf(RoomConfig()) }
-    var activeOutdoorSettings by remember { mutableStateOf(LiveRoomSettings()) }
-    var hasActiveRoom by remember { mutableStateOf(false) }
+    var activeOutdoorSettings by remember { mutableStateOf(LiveRoomSettings(roomCode = "SH7KQ2")) }
+    var hasActiveRoom by remember { mutableStateOf(true) }
 
     val players by engine.players.collectAsState()
     val outdoorPlayers by outdoorEngine.players.collectAsState()
@@ -184,7 +185,7 @@ fun ShadowHuntApp(
     }
 
     // Handle Back Button navigation
-    BackHandler(enabled = currentScreen != Screen.Home) {
+    BackHandler(enabled = currentScreen != Screen.Home && currentScreen != Screen.Login) {
         when (currentScreen) {
             Screen.CreateRoom, Screen.JoinRoom -> currentScreen = Screen.Home
             Screen.Lobby -> currentScreen = Screen.Home
@@ -212,6 +213,19 @@ fun ShadowHuntApp(
     ) {
         // CONTENT AREA
         when (currentScreen) {
+            Screen.Login -> {
+                LoginScreen(
+                    onLoginSuccess = { codename ->
+                        soundEffects.playClick()
+                        userProfile = userProfile.copy(nickname = codename)
+                        currentScreen = Screen.Home
+                    },
+                    onGuestLogin = {
+                        soundEffects.playClick()
+                        currentScreen = Screen.Home
+                    }
+                )
+            }
             Screen.Home -> {
                 HomeScreen(
                     profile = userProfile,
@@ -236,10 +250,17 @@ fun ShadowHuntApp(
                     },
                     onRejoinRoom = {
                         soundEffects.playClick()
-                        currentScreen = Screen.OutdoorArena
+                        activeOutdoorSettings = activeOutdoorSettings.copy(roomCode = "SH7KQ2")
+                        permissionLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION,
+                                Manifest.permission.CAMERA
+                            )
+                        )
                     },
-                    hasActiveRoom = hasActiveRoom,
-                    activeRoomCode = activeRoomConfig.code,
+                    hasActiveRoom = true,
+                    activeRoomCode = "SH7KQ2",
                     onOpenProfile = {
                         selectedTab = NavigationTab.PROFILE
                         currentScreen = Screen.Profile

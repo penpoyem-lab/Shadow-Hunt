@@ -1,13 +1,15 @@
 package com.example.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,14 +19,27 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.model.UserProfileData
-import com.example.ui.components.*
+import com.example.ui.components.GlassPanel
 import com.example.ui.theme.*
 
+/**
+ * Shadow Hunt Home Screen matching IMG_20261104_102912.png
+ * Features:
+ *  - Top status bar with sound & settings controls
+ *  - High-intensity Hero Radar banner with hunter art and circular scanner
+ *  - "REJOIN YOUR GAME" room card (SH7KQ2)
+ *  - Glowing neon "CREATE A GAME >>" (red) and "JOIN WITH CODE >>" (purple) pill buttons
+ *  - "GLOBAL CHAT" "● LIVE" feed card with RexHunter and ShadowKing
+ *  - "Already have an account? Restore it"
+ *  - Bottom stats: 2.5M+ Total Players | 1.8M+ Players Caught | 742K+ Victories
+ */
 @Composable
 fun HomeScreen(
     profile: UserProfileData,
@@ -32,163 +47,102 @@ fun HomeScreen(
     onCreateRoom: () -> Unit,
     onJoinRoom: () -> Unit,
     onRejoinRoom: () -> Unit,
-    hasActiveRoom: Boolean,
-    activeRoomCode: String,
+    hasActiveRoom: Boolean = true,
+    activeRoomCode: String = "SH7KQ2",
     onOpenProfile: () -> Unit,
     onOpenSettings: () -> Unit
 ) {
+    var isMuted by remember { mutableStateOf(false) }
+    var showChatDialog by remember { mutableStateOf(false) }
+    var showRestoreDialog by remember { mutableStateOf(false) }
+
     val scrollState = rememberScrollState()
+
+    // Pulse animation for LIVE indicator & border glows
+    val infiniteTransition = rememberInfiniteTransition(label = "homePulse")
+    val liveAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "liveAlpha"
+    )
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(DarkBackground)
             .verticalScroll(scrollState)
-            .padding(bottom = 90.dp) // space for bottom nav bar
+            .padding(bottom = 90.dp) // Leave room for bottom navigation
     ) {
-        // TOP STATUS BAR (Coins, Diamonds, Profile level, Settings)
+        // 1. TOP HEADER BAR: Sound Toggle & Settings Gear
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .statusBarsPadding()
+                .padding(horizontal = 20.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // User Avatar & Level
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
+            // Sound Mute Toggle Button
+            IconButton(
+                onClick = { isMuted = !isMuted },
                 modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .clickable { onOpenProfile() }
-                    .padding(4.dp)
+                    .size(42.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF131726))
+                    .border(1.dp, Color(0xFF2E334D), CircleShape)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .border(2.dp, NeonPurple, CircleShape)
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.avatar_anime_kishalay),
-                        contentDescription = "User Avatar",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = profile.nickname,
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = Color.White
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Icon(
-                            imageVector = Icons.Default.EmojiEvents,
-                            contentDescription = null,
-                            tint = GoldAccent,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                    Text(
-                        text = "Lv.${profile.level}  •  ${profile.currentXp}/${profile.maxXp} XP",
-                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 11.sp),
-                        color = TextSecondary
-                    )
-                }
+                Icon(
+                    imageVector = if (isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+                    contentDescription = "Sound Toggle",
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
             }
 
-            // Currency & Settings
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // Coins
-                GlassPanel(
-                    modifier = Modifier.padding(end = 6.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    backgroundColor = DarkSurfaceVariant.copy(alpha = 0.8f)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(16.dp)
-                                .clip(CircleShape)
-                                .background(GoldAccent)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "12,750",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = Color.White
-                        )
-                    }
-                }
+            Spacer(modifier = Modifier.width(10.dp))
 
-                // Diamonds
-                GlassPanel(
-                    modifier = Modifier.padding(end = 8.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    backgroundColor = DarkSurfaceVariant.copy(alpha = 0.8f)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Diamond,
-                            contentDescription = null,
-                            tint = ElectricBlue,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "150",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = Color.White
-                        )
-                    }
-                }
-
-                // Settings Gear
-                IconButton(
-                    onClick = onOpenSettings,
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(CircleShape)
-                        .background(DarkSurfaceVariant)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = "Settings",
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
+            // Settings Gear Button
+            IconButton(
+                onClick = onOpenSettings,
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF131726))
+                    .border(1.dp, Color(0xFF2E334D), CircleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "Settings",
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
             }
         }
 
-        // HERO BANNER (Original Artwork from uploaded mockups)
+        // 2. HERO BANNER: Hunter, Moon, Cityline & Radar Scanner
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(310.dp)
+                .height(300.dp)
         ) {
             Image(
-                painter = painterResource(id = R.drawable.hero_shadow_hunt),
-                contentDescription = "Shadow Hunt Hero",
+                painter = painterResource(id = R.drawable.hero_radar_banner),
+                contentDescription = "Shadow Hunt Hunter and Tactical Radar",
                 contentScale = ContentScale.FillWidth,
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.TopCenter)
             )
 
-            // Bottom Gradient Fade
+            // Bottom gradient fade into dark background
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(90.dp)
+                    .height(60.dp)
                     .align(Alignment.BottomCenter)
                     .background(
                         brush = Brush.verticalGradient(
@@ -198,290 +152,249 @@ fun HomeScreen(
             )
         }
 
-        // ACTION BUTTONS SECTION
+        // 3. ACTION CONTROLS SECTION (Matching IMG_20261104_102912.png)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // PLAY NOW (Primary Glowing Red Button)
-            NeonGamingButton(
-                text = "PLAY NOW",
-                onClick = onPlayNow,
-                icon = Icons.Default.PlayArrow,
-                gradientColors = listOf(Color(0xFFFF1E43), Color(0xFFD50000)),
-                borderColor = Color(0xFFFF5252),
-                height = 58.dp
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // CREATE ROOM and JOIN ROOM (Dual Neon Action Row)
-            Row(
+            // CARD 1: REJOIN YOUR GAME (Room Code: SH7KQ2)
+            Surface(
+                onClick = onRejoinRoom,
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                shape = RoundedCornerShape(22.dp),
+                color = Color(0xFF0F1322),
+                border = BorderStroke(
+                    width = 2.dp,
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(
+                            Color(0xFFFF1744),
+                            Color(0xFF9C27B0),
+                            Color(0xFF00E5FF)
+                        )
+                    )
+                )
             ) {
-                // CREATE ROOM (Electric Blue)
-                NeonGamingButton(
-                    text = "CREATE ROOM",
-                    onClick = onCreateRoom,
-                    icon = Icons.Default.Add,
-                    trailingText = "",
-                    gradientColors = listOf(Color(0xFF00B0FF), Color(0xFF0072FF)),
-                    borderColor = Color(0xFF40C4FF),
-                    height = 50.dp,
-                    modifier = Modifier.weight(1f)
-                )
-
-                // JOIN ROOM (Neon Purple)
-                NeonGamingButton(
-                    text = "JOIN ROOM",
-                    onClick = onJoinRoom,
-                    icon = Icons.Default.Group,
-                    trailingText = "",
-                    gradientColors = listOf(Color(0xFF9D00FF), Color(0xFF6200EA)),
-                    borderColor = Color(0xFFB388FF),
-                    height = 50.dp,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            // REJOIN ACTIVE GAME CARD (If room exists)
-            if (hasActiveRoom) {
-                Spacer(modifier = Modifier.height(14.dp))
-                GlassPanel(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { onRejoinRoom() },
-                    borderColor = NeonRed,
-                    shape = RoundedCornerShape(18.dp)
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
+                    // Left Circular Red Replay Icon
+                    Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF2A101A))
+                            .border(1.5.dp, Color(0xFFFF1744), CircleShape),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(38.dp)
-                                    .clip(CircleShape)
-                                    .background(NeonRed.copy(alpha = 0.2f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Refresh,
-                                    contentDescription = null,
-                                    tint = NeonRed,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text(
-                                    text = "REJOIN YOUR GAME",
-                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = Color.White
-                                )
-                                Text(
-                                    text = "Room Code: $activeRoomCode",
-                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = NeonRed
-                                )
-                            }
-                        }
                         Icon(
-                            imageVector = Icons.Default.ChevronRight,
-                            contentDescription = null,
-                            tint = Color.White
-                        )
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // HOW TO PLAY SECTION
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-        ) {
-            GlassPanel(
-                modifier = Modifier.fillMaxWidth(),
-                borderColor = Color(0xFF323456),
-                shape = RoundedCornerShape(20.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "// ",
-                                color = NeonRed,
-                                fontWeight = FontWeight.Black
-                            )
-                            Text(
-                                text = "HOW TO PLAY ?",
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
-                                color = Color.White
-                            )
-                        }
-                        Text(
-                            text = "Learn More >",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                            color = ElectricBlue
+                            imageVector = Icons.Default.Replay,
+                            contentDescription = "Rejoin",
+                            tint = Color(0xFFFF1744),
+                            modifier = Modifier.size(26.dp)
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.width(14.dp))
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        HowToPlayStepItem(
-                            stepNumber = 1,
-                            title = "Join Room",
-                            subtitle = "Create or join a game",
-                            icon = Icons.Default.Groups,
-                            accentColor = ElectricBlue,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Icon(
-                            imageVector = Icons.Default.ChevronRight,
-                            contentDescription = null,
-                            tint = TextMuted,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        HowToPlayStepItem(
-                            stepNumber = 2,
-                            title = "Hide or Seek",
-                            subtitle = "Be hunter or runner",
-                            icon = Icons.Default.DirectionsRun,
-                            accentColor = NeonPurple,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Icon(
-                            imageVector = Icons.Default.ChevronRight,
-                            contentDescription = null,
-                            tint = TextMuted,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        HowToPlayStepItem(
-                            stepNumber = 3,
-                            title = "Survive & Win",
-                            subtitle = "Outsmart the zone",
-                            icon = Icons.Default.EmojiEvents,
-                            accentColor = GoldAccent,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // GAME STATS CARD
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-        ) {
-            GlassPanel(
-                modifier = Modifier.fillMaxWidth(),
-                borderColor = Color(0xFF323456),
-                shape = RoundedCornerShape(20.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    // Text Info: "REJOIN YOUR GAME" + "Room Code: SH7KQ2"
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "// ",
-                            color = NeonRed,
-                            fontWeight = FontWeight.Black
-                        )
-                        Text(
-                            text = "GAME STATS",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+                            text = "REJOIN YOUR GAME",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Black,
+                                fontStyle = FontStyle.Italic,
+                                letterSpacing = 1.sp
+                            ),
                             color = Color.White
                         )
-                        Spacer(modifier = Modifier.weight(1f))
-                        Text(
-                            text = "• Live Global",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = NeonGreen
-                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Room Code: ",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = Color(0xFFB0B7C3)
+                            )
+                            Text(
+                                text = activeRoomCode,
+                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black),
+                                color = Color(0xFFFF1744)
+                            )
+                        }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    // Forward Chevron
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                        contentDescription = "Enter",
+                        tint = Color.White.copy(alpha = 0.8f),
+                        modifier = Modifier.size(18.dp)
+                    )
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceAround
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    // Divider
+                    Box(
+                        modifier = Modifier
+                            .width(1.dp)
+                            .height(34.dp)
+                            .background(Color(0xFF2E334D))
+                    )
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    // "2-10 Players" badge
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
                     ) {
-                        StatCounterBox(
-                            value = "2.5M+",
-                            label = "Total Games",
-                            icon = Icons.Default.SportsEsports,
-                            iconTint = ElectricBlue,
-                            modifier = Modifier.weight(1f)
+                        Icon(
+                            imageVector = Icons.Default.Groups,
+                            contentDescription = null,
+                            tint = Color(0xFF8C98B2),
+                            modifier = Modifier.size(22.dp)
                         )
-                        Box(
-                            modifier = Modifier
-                                .width(1.dp)
-                                .height(50.dp)
-                                .background(DarkCardBorder)
+                        Text(
+                            text = "2-10",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = Color.White
                         )
-                        StatCounterBox(
-                            value = "1.8M+",
-                            label = "Players Caught",
-                            icon = Icons.Default.GpsFixed,
-                            iconTint = NeonRed,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Box(
-                            modifier = Modifier
-                                .width(1.dp)
-                                .height(50.dp)
-                                .background(DarkCardBorder)
-                        )
-                        StatCounterBox(
-                            value = "742K+",
-                            label = "Victories",
-                            icon = Icons.Default.EmojiEvents,
-                            iconTint = GoldAccent,
-                            modifier = Modifier.weight(1f)
+                        Text(
+                            text = "Players",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                            color = Color(0xFF8C98B2)
                         )
                     }
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // RECENT ACHIEVEMENTS
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-        ) {
-            GlassPanel(
-                modifier = Modifier.fillMaxWidth(),
-                borderColor = Color(0xFF323456),
-                shape = RoundedCornerShape(20.dp)
+            // BUTTON 2: CREATE A GAME >> (Large Neon Red Pill Button)
+            Surface(
+                onClick = onCreateRoom,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(64.dp),
+                shape = RoundedCornerShape(22.dp),
+                color = Color.Transparent,
+                border = BorderStroke(2.dp, Color(0xFFFF3366))
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(Color(0xFFFF1744), Color(0xFFD50000))
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.SportsEsports,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(28.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "CREATE A GAME",
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.Black,
+                                fontStyle = FontStyle.Italic,
+                                letterSpacing = 1.sp
+                            ),
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = ">>",
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 2.sp
+                            ),
+                            color = Color(0xFFFF80AB)
+                        )
+                    }
+                }
+            }
+
+            // BUTTON 3: JOIN WITH CODE >> (Large Neon Purple Pill Button)
+            Surface(
+                onClick = onJoinRoom,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(64.dp),
+                shape = RoundedCornerShape(22.dp),
+                color = Color.Transparent,
+                border = BorderStroke(2.dp, Color(0xFF7C4DFF))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(Color(0xFF651FFF), Color(0xFF4A148C))
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.VpnKey,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(26.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "JOIN WITH CODE",
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.Black,
+                                fontStyle = FontStyle.Italic,
+                                letterSpacing = 1.sp
+                            ),
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = ">>",
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 2.sp
+                            ),
+                            color = Color(0xFFB388FF)
+                        )
+                    }
+                }
+            }
+
+            // CARD 4: GLOBAL CHAT LIVE
+            Surface(
+                onClick = { showChatDialog = true },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(22.dp),
+                color = Color(0xFF0D1222),
+                border = BorderStroke(
+                    width = 1.5.dp,
+                    color = Color(0xFF00E5FF).copy(alpha = 0.5f)
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    // Chat Header Row: GLOBAL CHAT + LIVE indicator
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -489,74 +402,309 @@ fun HomeScreen(
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
-                                imageVector = Icons.Default.Star,
+                                imageVector = Icons.Default.ChatBubble,
                                 contentDescription = null,
-                                tint = NeonPurple,
+                                tint = Color(0xFF00E5FF),
                                 modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "GLOBAL CHAT",
+                                style = MaterialTheme.typography.titleSmall.copy(
+                                    fontWeight = FontWeight.Black,
+                                    letterSpacing = 1.sp
+                                ),
+                                color = Color(0xFF00E5FF)
+                            )
+                        }
+
+                        // Live green pulsing badge
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF00E676).copy(alpha = liveAlpha))
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Recent Achievements",
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                color = Color.White
+                                text = "LIVE",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = Color(0xFF00E676)
                             )
                         }
-                        Text(
-                            text = "View All >",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                            color = NeonPurple
-                        )
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
+                    // Chat messages preview
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        AchievementBadgeItem("First Hunt", Icons.Default.MilitaryTech, GoldAccent)
-                        AchievementBadgeItem("Master Seeker", Icons.Default.Security, NeonPurple)
-                        AchievementBadgeItem("Survivor", Icons.Default.DirectionsRun, ElectricBlue)
-                        AchievementBadgeItem("Perfect Round", Icons.Default.Adjust, NeonRed)
-                        AchievementBadgeItem("???", Icons.Default.Lock, TextMuted)
+                        // Avatar
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(CircleShape)
+                                .border(1.5.dp, Color(0xFF7C4DFF), CircleShape)
+                        ) {
+                            Image(
+                                painter = painterResource(id = R.drawable.avatar_cyber),
+                                contentDescription = "RexHunter Avatar",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        // Message Lines
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "RexHunter : ",
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = Color.White
+                                )
+                                Text(
+                                    text = "The zone shrinks soon!",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color(0xFFB0B7C3)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "ShadowKing : ",
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = Color.White
+                                )
+                                Text(
+                                    text = "Let's win this! 🔥",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color.White
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Timestamp: Last message 2 min ago
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(start = 56.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Schedule,
+                            contentDescription = null,
+                            tint = Color(0xFF6B7280),
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Last message 2 min ago",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                            color = Color(0xFF6B7280)
+                        )
+                    }
+                }
+            }
+
+            // ACTION: Already have an account? Restore it
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showRestoreDialog = true }
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Sync,
+                    contentDescription = null,
+                    tint = Color(0xFFB0B7C3),
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Already have an account? Restore it",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.Medium,
+                        letterSpacing = 0.5.sp
+                    ),
+                    color = Color(0xFFB0B7C3)
+                )
+            }
+
+            // BOTTOM STATS CARD (2.5M+ / 1.8M+ / 742K+)
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(22.dp),
+                color = Color(0xFF0F1322),
+                border = BorderStroke(
+                    width = 1.5.dp,
+                    color = Color(0xFF7C4DFF).copy(alpha = 0.4f)
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Stat 1: Total Players
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Groups,
+                            contentDescription = null,
+                            tint = Color(0xFF00E5FF),
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = "2.5M+",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+                                color = Color.White
+                            )
+                            Text(
+                                text = "Total Players",
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                color = Color(0xFF8C98B2)
+                            )
+                        }
+                    }
+
+                    // Divider 1
+                    Box(
+                        modifier = Modifier
+                            .width(1.dp)
+                            .height(28.dp)
+                            .background(Color(0xFF2E334D))
+                    )
+
+                    // Stat 2: Players Caught
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.GpsFixed,
+                            contentDescription = null,
+                            tint = Color(0xFFFF1744),
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = "1.8M+",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+                                color = Color.White
+                            )
+                            Text(
+                                text = "Players Caught",
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                color = Color(0xFF8C98B2)
+                            )
+                        }
+                    }
+
+                    // Divider 2
+                    Box(
+                        modifier = Modifier
+                            .width(1.dp)
+                            .height(28.dp)
+                            .background(Color(0xFF2E334D))
+                    )
+
+                    // Stat 3: Victories
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.EmojiEvents,
+                            contentDescription = null,
+                            tint = Color(0xFFFFD600),
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = "742K+",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+                                color = Color.White
+                            )
+                            Text(
+                                text = "Victories",
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                color = Color(0xFF8C98B2)
+                            )
+                        }
                     }
                 }
             }
         }
     }
-}
 
-@Composable
-private fun AchievementBadgeItem(
-    title: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    accentColor: Color
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(62.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(46.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(accentColor.copy(alpha = 0.15f))
-                .border(1.5.dp, accentColor, RoundedCornerShape(12.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = accentColor,
-                modifier = Modifier.size(24.dp)
-            )
-        }
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 10.sp),
-            color = Color.White,
-            maxLines = 1
+    // Account Restore Dialog
+    if (showRestoreDialog) {
+        AlertDialog(
+            onDismissRequest = { showRestoreDialog = false },
+            title = {
+                Text("Restore Hunter Account", color = Color.White, fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Text(
+                    "Your Hunter ID (${profile.playerId}) and achievements are currently active on this device. Would you like to re-verify your Google Cloud sync?",
+                    color = TextSecondary
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showRestoreDialog = false }) {
+                    Text("OK", color = ElectricBlue)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRestoreDialog = false }) {
+                    Text("Cancel", color = TextSecondary)
+                }
+            },
+            containerColor = DarkSurfaceVariant
+        )
+    }
+
+    // Global Chat Interactive Dialog
+    if (showChatDialog) {
+        AlertDialog(
+            onDismissRequest = { showChatDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(imageVector = Icons.Default.ChatBubble, contentDescription = null, tint = ElectricBlue)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Global Hunter Chat", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("🔴 RexHunter: The zone shrinks soon!", color = Color.White)
+                    Text("🟣 ShadowKing: Let's win this! 🔥", color = Color.White)
+                    Text("🟢 GhostRunner: Watch the north bridge, seekers incoming!", color = ElectricBlue)
+                    Text("🟡 HunterX: Locked target 18m away, deploying camera!", color = GoldAccent)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showChatDialog = false }) {
+                    Text("Close", color = ElectricBlue)
+                }
+            },
+            containerColor = DarkSurfaceVariant
         )
     }
 }

@@ -27,6 +27,7 @@ import com.example.model.PlayerRole
 import com.example.ui.components.GlassPanel
 import com.example.ui.components.NeonGamingButton
 import com.example.ui.map.DarkTacticalMap
+import com.example.ui.map.LeafletMapView
 import com.example.ui.theme.*
 import java.io.File
 import kotlin.math.sin
@@ -57,6 +58,7 @@ fun RealOutdoorArenaScreen(
 
     var miniMapMode by remember { mutableStateOf(MiniMapDisplayMode.CORNER) }
     var isCameraActive by remember { mutableStateOf(false) }
+    var useLeafletMap by remember { mutableStateOf(true) }
 
     // Pulsing Urgency Animation synchronized with timer
     val countdown = safeZone.countdownSeconds
@@ -120,24 +122,38 @@ fun RealOutdoorArenaScreen(
             .fillMaxSize()
             .background(DarkBackground)
     ) {
-        // 1. FULL REAL GPS DARK TACTICAL MAP
-        DarkTacticalMap(
-            centerLatitude = safeZone.centerLatitude,
-            centerLongitude = safeZone.centerLongitude,
-            userLatitude = userLat,
-            userLongitude = userLon,
-            userBearing = userBearing,
-            safeZone = safeZone,
-            players = players,
-            isSeeker = isSeeker,
-            sonarActive = sonarActive,
-            urgencyLevel = urgencyLevel,
-            breathingOffsetPx = breathingOffsetPx,
-            pulseProgress = pulseProgress,
-            shockwaveAlpha = shockwaveAlpha,
-            shockwaveExpansionDp = shockwaveExpansionDp,
-            modifier = Modifier.fillMaxSize()
-        )
+        // 1. DUAL MAP ENGINE: OPENSTREETMAP LEAFLET TACTICAL TILES OR NATIVE CANVAS RADAR
+        if (useLeafletMap) {
+            LeafletMapView(
+                modifier = Modifier.fillMaxSize(),
+                userLatitude = userLat,
+                userLongitude = userLon,
+                userHeading = userBearing,
+                userRole = if (isSeeker) PlayerRole.SEEKER else PlayerRole.RUNNER,
+                safeZone = safeZone,
+                runners = players.filter { it.role == PlayerRole.RUNNER },
+                isRadarPulseActive = sonarActive,
+                onRunnerSelected = { /* runner clicked */ }
+            )
+        } else {
+            DarkTacticalMap(
+                centerLatitude = safeZone.centerLatitude,
+                centerLongitude = safeZone.centerLongitude,
+                userLatitude = userLat,
+                userLongitude = userLon,
+                userBearing = userBearing,
+                safeZone = safeZone,
+                players = players,
+                isSeeker = isSeeker,
+                sonarActive = sonarActive,
+                urgencyLevel = urgencyLevel,
+                breathingOffsetPx = breathingOffsetPx,
+                pulseProgress = pulseProgress,
+                shockwaveAlpha = shockwaveAlpha,
+                shockwaveExpansionDp = shockwaveExpansionDp,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
 
         // 2. TOP STATUS BAR HUD
         Column(
@@ -161,6 +177,32 @@ fun RealOutdoorArenaScreen(
                         .border(1.dp, DarkCardBorder, CircleShape)
                 ) {
                     Icon(imageVector = Icons.Default.Pause, contentDescription = "Exit", tint = Color.White)
+                }
+
+                // Map Engine Switch (Leaflet OSM vs Radar)
+                Surface(
+                    onClick = { useLeafletMap = !useLeafletMap },
+                    shape = RoundedCornerShape(14.dp),
+                    color = if (useLeafletMap) ElectricBlue.copy(alpha = 0.25f) else DarkSurfaceGlass,
+                    border = BorderStroke(1.dp, if (useLeafletMap) ElectricBlue else DarkCardBorder)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = if (useLeafletMap) Icons.Default.Map else Icons.Default.Radar,
+                            contentDescription = "Map Mode",
+                            tint = if (useLeafletMap) ElectricBlue else NeonRed,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (useLeafletMap) "OSM MAP" else "RADAR",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = Color.White
+                        )
+                    }
                 }
 
                 // Live Game Timer
