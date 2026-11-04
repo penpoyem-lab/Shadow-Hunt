@@ -100,7 +100,7 @@
   <div id="map"></div>
   <div class="hud-tactical-badge">
     <div class="dot"></div>
-    <div>MAPLIBRE TACTICAL GPS | <span id="hudZone">ZONE: 400m</span></div>
+    <div><span id="hudGpsCoords">GPS SEARCHING...</span> | <span id="hudZone">ZONE: 400m</span></div>
   </div>
 
   <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
@@ -254,6 +254,8 @@
       currentRole = role;
     }
 
+    var hasCenteredOnRealGps = false;
+
     function updatePlayerLocation(lat, lng, heading) {
       userCoords = [lng, lat];
       if (!map) return;
@@ -268,8 +270,24 @@
           .addTo(map);
 
         map.flyTo({ center: [lng, lat], zoom: 17.5, speed: 1.2 });
+        hasCenteredOnRealGps = true;
       } else {
         userMarker.setLngLat([lng, lat]);
+        if (!hasCenteredOnRealGps) {
+          map.flyTo({ center: [lng, lat], zoom: 17.5, speed: 1.2 });
+          hasCenteredOnRealGps = true;
+        }
+      }
+
+      var hudGps = document.getElementById('hudGpsCoords');
+      if (hudGps) {
+        hudGps.innerText = 'GPS: ' + lat.toFixed(5) + ', ' + lng.toFixed(5);
+      }
+    }
+
+    function centerOnPlayer() {
+      if (map && userCoords) {
+        map.flyTo({ center: userCoords, zoom: 18, speed: 1.5, curve: 1 });
       }
     }
 

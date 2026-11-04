@@ -57,6 +57,7 @@ fun MapLibreMapView(
     safeZone: RealGpsSafeZone,
     runners: List<RealGpsPlayer> = emptyList(),
     isRadarPulseActive: Boolean = false,
+    recenterTrigger: Int = 0,
     onRunnerSelected: (RealGpsPlayer) -> Unit = {}
 ) {
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
@@ -170,6 +171,13 @@ fun MapLibreMapView(
     LaunchedEffect(isRadarPulseActive) {
         if (isRadarPulseActive && isMapInitialized && webViewRef != null) {
             webViewRef?.evaluateJavascript("javascript:if(window.triggerRadarPulse) window.triggerRadarPulse();", null)
+        }
+    }
+
+    // Trigger map camera re-centering on exact player GPS location
+    LaunchedEffect(recenterTrigger) {
+        if (recenterTrigger > 0 && isMapInitialized && webViewRef != null) {
+            webViewRef?.evaluateJavascript("javascript:if(window.centerOnPlayer) window.centerOnPlayer();", null)
         }
     }
 

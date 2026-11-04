@@ -52,6 +52,7 @@ class RealOutdoorGameEngine(
     var roomSettings = LiveRoomSettings()
     private var engineScope: CoroutineScope? = null
     private var isRunning = false
+    private var hasAnchoredToRealGps = false
 
     fun initializeRoom(
         settings: LiveRoomSettings,
@@ -61,6 +62,7 @@ class RealOutdoorGameEngine(
     ) {
         roomSettings = settings
         val currentLoc = locationManager.currentLocation.value
+        hasAnchoredToRealGps = (currentLoc != null)
         val lat = currentLoc?.latitude ?: settings.centerLatitude
         val lon = currentLoc?.longitude ?: settings.centerLongitude
 
@@ -210,8 +212,47 @@ class RealOutdoorGameEngine(
         }
     }
 
+    fun anchorGameToLocation(lat: Double, lon: Double) {
+        val currentList = _players.value.map { it.copy() }.toMutableList()
+        val local = currentList.find { it.isLocalPlayer }
+        if (local != null) {
+            local.latitude = lat
+            local.longitude = lon
+        }
+
+        // Scatter other players realistically around the user's real location (50m - 140m)
+        val otherPlayers = currentList.filter { !it.isLocalPlayer }
+        val count = otherPlayers.size
+        otherPlayers.forEachIndexed { index, runner ->
+            val angle = (index * 2.0 * Math.PI / count.coerceAtLeast(1))
+            val distMeters = 50.0 + Random.nextDouble(20.0, 90.0)
+            val dLat = (distMeters * Math.cos(angle)) / 111320.0
+            val dLon = (distMeters * Math.sin(angle)) / (111320.0 * Math.cos(Math.toRadians(lat)))
+            runner.latitude = lat + dLat
+            runner.longitude = lon + dLon
+        }
+
+        _players.value = currentList
+
+        // Re-anchor safe zone center to player's real coordinates
+        val zone = _safeZone.value
+        _safeZone.value = zone.copy(
+            centerLatitude = lat,
+            centerLongitude = lon
+        )
+        postAlert("📍 GPS LOCKED: Arena centered on your real location!")
+    }
+
     private fun updateLocations() {
         val currentLoc = locationManager.currentLocation.value ?: return
+
+        // If not yet anchored to true real GPS location, anchor the arena & runners now
+        if (!hasAnchoredToRealGps) {
+            hasAnchoredToRealGps = true
+            anchorGameToLocation(currentLoc.latitude, currentLoc.longitude)
+            return
+        }
+
         val currentList = _players.value.map { it.copy() }.toMutableList()
         val local = currentList.find { it.isLocalPlayer } ?: return
 

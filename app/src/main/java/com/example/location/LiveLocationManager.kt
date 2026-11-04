@@ -35,11 +35,27 @@ class LiveLocationManager(private val context: Context) {
     fun startLocationUpdates() {
         stopLocationUpdates()
 
-        // Fetch last known location immediately
+        // Fetch last known location immediately from both Fused and System LocationManager
         try {
             fusedLocationClient.lastLocation.addOnSuccessListener { loc ->
-                if (loc != null) {
+                if (loc != null && _currentLocation.value == null) {
                     _currentLocation.value = loc
+                }
+            }
+            fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
+                .addOnSuccessListener { loc ->
+                    if (loc != null) {
+                        _currentLocation.value = loc
+                    }
+                }
+
+            val sysLocManager = context.getSystemService(Context.LOCATION_SERVICE) as? android.location.LocationManager
+            if (sysLocManager != null) {
+                val gpsLoc = sysLocManager.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER)
+                val netLoc = sysLocManager.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER)
+                val best = gpsLoc ?: netLoc
+                if (best != null && _currentLocation.value == null) {
+                    _currentLocation.value = best
                 }
             }
         } catch (_: Exception) {}

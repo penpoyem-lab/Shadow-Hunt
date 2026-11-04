@@ -16,6 +16,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -60,6 +61,7 @@ fun RealOutdoorArenaScreen(
     var miniMapMode by remember { mutableStateOf(MiniMapDisplayMode.CORNER) }
     var isCameraActive by remember { mutableStateOf(false) }
     var useMapLibreMap by remember { mutableStateOf(true) }
+    var recenterTrigger by remember { mutableStateOf(0) }
 
     // Pulsing Urgency Animation synchronized with timer
     val countdown = safeZone.countdownSeconds
@@ -134,6 +136,7 @@ fun RealOutdoorArenaScreen(
                 safeZone = safeZone,
                 runners = players.filter { it.role == PlayerRole.RUNNER },
                 isRadarPulseActive = sonarActive,
+                recenterTrigger = recenterTrigger,
                 onRunnerSelected = { /* runner clicked */ }
             )
         } else {
@@ -329,6 +332,60 @@ fun RealOutdoorArenaScreen(
                     }
                 }
             }
+
+            // Real-Time GPS Precision Telemetry Pill
+            GlassPanel(
+                shape = RoundedCornerShape(12.dp),
+                borderColor = if (currentLocation != null) Color(0xFF1B5E20) else Color(0xFF5D4037),
+                backgroundColor = Color(0xCC090C16),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 6.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(if (currentLocation != null) NeonGreen else GoldAccent)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (currentLocation != null) {
+                                "GPS: %.5f, %.5f (±%.0fm)".format(
+                                    currentLocation!!.latitude,
+                                    currentLocation!!.longitude,
+                                    currentLocation!!.accuracy
+                                )
+                            } else {
+                                "SEARCHING GPS SATELLITES..."
+                            },
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = if (currentLocation != null) NeonGreen else GoldAccent
+                        )
+                    }
+
+                    Text(
+                        text = if (currentLocation != null) "LIVE LOCKED" else "ACQUIRING",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = if (currentLocation != null) NeonGreen else Color(0xFF9E9E9E)
+                    )
+                }
+            }
         }
 
         // 3. FLOATING ALERT TOAST
@@ -353,6 +410,54 @@ fun RealOutdoorArenaScreen(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(text = alertMessage ?: "", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = Color.White)
                 }
+            }
+        }
+
+        // 4. FLOATING TACTICAL ACTION BUTTONS (Right Edge)
+        Column(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Recenter Map on Player's Exact GPS Location
+            FloatingActionButton(
+                onClick = {
+                    recenterTrigger++
+                    if (currentLocation != null) {
+                        engine.anchorGameToLocation(currentLocation!!.latitude, currentLocation!!.longitude)
+                    }
+                },
+                containerColor = Color(0xFF0F1322),
+                contentColor = ElectricBlue,
+                shape = CircleShape,
+                modifier = Modifier
+                    .size(48.dp)
+                    .border(1.5.dp, ElectricBlue, CircleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.MyLocation,
+                    contentDescription = "Recenter on My Location",
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            // Radar Sonar Ping Scan Button
+            FloatingActionButton(
+                onClick = { engine.triggerSonarPing() },
+                containerColor = Color(0xFF0F1322),
+                contentColor = if (isSeeker) NeonRed else ElectricBlue,
+                shape = CircleShape,
+                modifier = Modifier
+                    .size(48.dp)
+                    .border(1.5.dp, if (isSeeker) NeonRed else ElectricBlue, CircleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Radar,
+                    contentDescription = "Radar Ping",
+                    modifier = Modifier.size(24.dp)
+                )
             }
         }
 
