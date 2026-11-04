@@ -85,13 +85,40 @@ fun BustedCardDialog(
                         .border(1.5.dp, NeonRed, RoundedCornerShape(16.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    // Try to show the pre-rendered Busted art if present, or character mugshot
-                    Image(
-                        painter = painterResource(id = R.drawable.busted_card_art),
-                        contentDescription = "Busted Artwork",
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier.fillMaxSize()
-                    )
+                    val photoFile = card.capturedPhotoPath?.let { java.io.File(it) }
+                    if (photoFile != null && photoFile.exists()) {
+                        coil.compose.AsyncImage(
+                            model = photoFile,
+                            contentDescription = "Real Captured Mugshot",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        // BUSTED Red Stamp Overlay on top of real photo
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color(0x33FF0000))
+                                .padding(12.dp)
+                        ) {
+                            Text(
+                                text = "BUSTED!",
+                                style = MaterialTheme.typography.displayMedium.copy(
+                                    fontWeight = FontWeight.Black,
+                                    letterSpacing = 2.sp
+                                ),
+                                color = NeonRed,
+                                modifier = Modifier.align(Alignment.Center)
+                            )
+                        }
+                    } else {
+                        // Pre-rendered Busted art
+                        Image(
+                            painter = painterResource(id = R.drawable.busted_card_art),
+                            contentDescription = "Busted Artwork",
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))

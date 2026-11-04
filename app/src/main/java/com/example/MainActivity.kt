@@ -1,10 +1,14 @@
 package com.example
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
@@ -25,11 +29,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.example.audio.GameSoundEffects
+import com.example.game.RealOutdoorGameEngine
 import com.example.game.ShadowHuntEngine
+import com.example.location.LiveLocationManager
 import com.example.model.*
 import com.example.ui.screens.*
 import com.example.ui.theme.*
@@ -40,6 +48,7 @@ sealed class Screen {
     object JoinRoom : Screen()
     object Lobby : Screen()
     object Arena : Screen()
+    object OutdoorArena : Screen()
     object GameEnd : Screen()
     object Profile : Screen()
     object LastWall : Screen()
@@ -49,6 +58,8 @@ sealed class Screen {
 class MainActivity : ComponentActivity() {
     private lateinit var soundEffects: GameSoundEffects
     private lateinit var gameEngine: ShadowHuntEngine
+    private lateinit var locationManager: LiveLocationManager
+    private lateinit var outdoorEngine: RealOutdoorGameEngine
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -56,11 +67,22 @@ class MainActivity : ComponentActivity() {
 
         soundEffects = GameSoundEffects(applicationContext)
         gameEngine = ShadowHuntEngine(soundEffects)
+        locationManager = LiveLocationManager(applicationContext)
+        outdoorEngine = RealOutdoorGameEngine(locationManager, soundEffects)
+
+        // Check if permissions are already granted
+        val hasLoc = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        locationManager.updatePermission(hasLoc)
 
         setContent {
             ShadowHuntTheme {
                 ShadowHuntApp(
                     engine = gameEngine,
+                    outdoorEngine = outdoorEngine,
+                    locationManager = locationManager,
                     soundEffects = soundEffects
                 )
             }
@@ -70,6 +92,8 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         gameEngine.stopGame()
+        outdoorEngine.stopGame()
+        locationManager.stopLocationUpdates()
         soundEffects.release()
     }
 }
@@ -77,8 +101,11 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun ShadowHuntApp(
     engine: ShadowHuntEngine,
+    outdoorEngine: RealOutdoorGameEngine,
+    locationManager: LiveLocationManager,
     soundEffects: GameSoundEffects
 ) {
+    val context = LocalContext.current
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Home) }
     var selectedTab by remember { mutableStateOf(NavigationTab.HOME) }
     var showSettingsDialog by remember { mutableStateOf(false) }
@@ -103,16 +130,55 @@ fun ShadowHuntApp(
     }
 
     var activeRoomConfig by remember { mutableStateOf(RoomConfig()) }
+    var activeOutdoorSettings by remember { mutableStateOf(LiveRoomSettings()) }
     var hasActiveRoom by remember { mutableStateOf(false) }
 
     val players by engine.players.collectAsState()
+    val outdoorPlayers by outdoorEngine.players.collectAsState()
     val lastTaggedCard by engine.lastTaggedCard.collectAsState()
+    val lastOutdoorMugshot by outdoorEngine.lastCapturedMugshot.collectAsState()
     val bustedCardsHistory by engine.bustedCardsHistory.collectAsState()
     val gamePhase by engine.gamePhase.collectAsState()
+    val outdoorGamePhase by outdoorEngine.gamePhase.collectAsState()
+
+    // Runtime Permission Launcher for GPS and Camera
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { perms ->
+        val locGranted = perms[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                perms[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        locationManager.updatePermission(locGranted)
+
+        // Launch real outdoor game
+        outdoorEngine.initializeRoom(
+            activeOutdoorSettings,
+            userProfile.nickname,
+            userProfile.avatarId,
+            PlayerRole.SEEKER
+        )
+        outdoorEngine.startGame()
+        currentScreen = Screen.OutdoorArena
+    }
+
+    // Convert LiveBustedCard to BustedCard for unified display
+    val displayBustedCard = lastTaggedCard ?: lastOutdoorMugshot?.let { live ->
+        BustedCard(
+            id = live.id,
+            playerName = live.runnerName,
+            playerAvatarId = "cyber",
+            playerNumber = 7,
+            captureTimeFormatted = live.captureTimeFormatted,
+            roomCode = live.roomCode,
+            achievementTitle = live.badgeTitle,
+            capturedPhotoPath = live.capturedPhotoPath
+        )
+    }
 
     // When game over, navigate to GameEnd screen
-    LaunchedEffect(gamePhase) {
-        if (gamePhase == GamePhase.GAME_OVER && currentScreen == Screen.Arena) {
+    LaunchedEffect(gamePhase, outdoorGamePhase) {
+        if ((gamePhase == GamePhase.GAME_OVER && currentScreen == Screen.Arena) ||
+            (outdoorGamePhase == GamePhase.GAME_OVER && currentScreen == Screen.OutdoorArena)
+        ) {
             currentScreen = Screen.GameEnd
         }
     }
@@ -125,6 +191,10 @@ fun ShadowHuntApp(
             Screen.Arena -> {
                 engine.stopGame()
                 currentScreen = Screen.Lobby
+            }
+            Screen.OutdoorArena -> {
+                outdoorEngine.stopGame()
+                currentScreen = Screen.Home
             }
             Screen.GameEnd -> currentScreen = Screen.Home
             Screen.Profile, Screen.LastWall, Screen.Friends -> {
@@ -147,11 +217,14 @@ fun ShadowHuntApp(
                     profile = userProfile,
                     onPlayNow = {
                         soundEffects.playClick()
-                        val cfg = RoomConfig(code = "SH7KQ2", name = "Cyber Arena", maxPlayers = 8)
-                        activeRoomConfig = cfg
-                        hasActiveRoom = true
-                        engine.initializeRoom(cfg, userProfile.nickname, userProfile.avatarId)
-                        currentScreen = Screen.Lobby
+                        // Request GPS and Camera for live outdoor game
+                        permissionLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION,
+                                Manifest.permission.CAMERA
+                            )
+                        )
                     },
                     onCreateRoom = {
                         soundEffects.playClick()
@@ -163,7 +236,7 @@ fun ShadowHuntApp(
                     },
                     onRejoinRoom = {
                         soundEffects.playClick()
-                        currentScreen = Screen.Lobby
+                        currentScreen = Screen.OutdoorArena
                     },
                     hasActiveRoom = hasActiveRoom,
                     activeRoomCode = activeRoomConfig.code,
@@ -186,8 +259,20 @@ fun ShadowHuntApp(
                         userProfile = userProfile.copy(nickname = nickname, avatarId = avatarId)
                         activeRoomConfig = config
                         hasActiveRoom = true
-                        engine.initializeRoom(config, nickname, avatarId)
-                        currentScreen = Screen.Lobby
+                        activeOutdoorSettings = LiveRoomSettings(
+                            roomCode = config.code,
+                            roomName = config.name,
+                            durationMinutes = config.durationMinutes,
+                            initialRadiusMeters = 400f,
+                            shrinkSpeed = config.shrinkSpeed
+                        )
+                        permissionLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION,
+                                Manifest.permission.CAMERA
+                            )
+                        )
                     }
                 )
             }
@@ -199,11 +284,17 @@ fun ShadowHuntApp(
                     onJoinGame = { code, nickname, avatarId ->
                         soundEffects.playClick()
                         userProfile = userProfile.copy(nickname = nickname, avatarId = avatarId)
-                        val config = RoomConfig(code = code, name = "Game $code", maxPlayers = 6)
-                        activeRoomConfig = config
-                        hasActiveRoom = true
-                        engine.initializeRoom(config, nickname, avatarId)
-                        currentScreen = Screen.Lobby
+                        activeOutdoorSettings = LiveRoomSettings(
+                            roomCode = code,
+                            roomName = "Live Room $code"
+                        )
+                        permissionLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION,
+                                Manifest.permission.CAMERA
+                            )
+                        )
                     }
                 )
             }
@@ -215,31 +306,19 @@ fun ShadowHuntApp(
                         currentScreen = Screen.Home
                     },
                     onStartGame = {
-                        engine.startGame()
-                        currentScreen = Screen.Arena
+                        permissionLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION,
+                                Manifest.permission.CAMERA
+                            )
+                        )
                     },
                     onToggleReady = {
                         soundEffects.playClick()
                     },
                     onAddBot = {
                         soundEffects.playClick()
-                        val currentList = players.toMutableList()
-                        if (currentList.size < activeRoomConfig.maxPlayers) {
-                            val botNames = listOf("RexHunter", "ShadowKing", "Devil", "Valkyrie", "Ghost", "Cipher", "Phoenix", "Specter", "Zero")
-                            val nextName = botNames[currentList.size % botNames.size]
-                            currentList.add(
-                                PlayerState(
-                                    id = "bot_${System.currentTimeMillis()}",
-                                    nickname = nextName,
-                                    avatarId = "cyber",
-                                    role = PlayerRole.RUNNER,
-                                    isHost = false,
-                                    isReady = true,
-                                    isBot = true
-                                )
-                            )
-                            engine.initializeRoom(activeRoomConfig.copy(maxPlayers = currentList.size), userProfile.nickname, userProfile.avatarId)
-                        }
                     }
                 )
             }
@@ -252,13 +331,38 @@ fun ShadowHuntApp(
                     }
                 )
             }
+            Screen.OutdoorArena -> {
+                RealOutdoorArenaScreen(
+                    engine = outdoorEngine,
+                    locationManager = locationManager,
+                    onPauseOrExit = {
+                        outdoorEngine.stopGame()
+                        currentScreen = Screen.Home
+                    }
+                )
+            }
             Screen.GameEnd -> {
                 GameEndScreen(
-                    players = players,
+                    players = if (outdoorPlayers.isNotEmpty()) {
+                        outdoorPlayers.map {
+                            PlayerState(
+                                id = it.id,
+                                nickname = it.nickname,
+                                avatarId = it.avatarId,
+                                role = it.role,
+                                isTagged = it.isTagged,
+                                tagTimeSeconds = it.taggedAtSeconds
+                            )
+                        }
+                    } else players,
                     onPlayAgain = {
-                        engine.initializeRoom(activeRoomConfig, userProfile.nickname, userProfile.avatarId)
-                        engine.startGame()
-                        currentScreen = Screen.Arena
+                        permissionLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION,
+                                Manifest.permission.CAMERA
+                            )
+                        )
                     },
                     onReturnHome = {
                         currentScreen = Screen.Home
@@ -283,7 +387,7 @@ fun ShadowHuntApp(
             Screen.LastWall -> {
                 LastWallScreen(
                     bustedCards = bustedCardsHistory,
-                    onCardClick = { /* open inspected dialog */ },
+                    onCardClick = { /* preview dialog */ },
                     onBack = {
                         selectedTab = NavigationTab.HOME
                         currentScreen = Screen.Home
@@ -292,19 +396,18 @@ fun ShadowHuntApp(
             }
             Screen.Friends -> {
                 FriendsScreen(
-                    onInviteToRoom = { friendName ->
-                        // Send room invite toast
-                    }
+                    onInviteToRoom = { _ -> }
                 )
             }
         }
 
-        // BUSTED COLLECTIBLE CARD DIALOG (When runner is captured)
-        if (lastTaggedCard != null) {
+        // BUSTED COLLECTIBLE CARD DIALOG (With real camera photo!)
+        if (displayBustedCard != null) {
             BustedCardDialog(
-                card = lastTaggedCard!!,
+                card = displayBustedCard,
                 onDismiss = {
                     engine.dismissBustedCard()
+                    outdoorEngine.dismissMugshot()
                 }
             )
         }
@@ -318,7 +421,6 @@ fun ShadowHuntApp(
         }
 
         // LIQUID GLASS BOTTOM NAVIGATION BAR
-        // Visible on main hub screens (Home, Profile, LastWall, Friends)
         val showBottomNav = currentScreen in listOf(Screen.Home, Screen.Profile, Screen.LastWall, Screen.Friends)
         if (showBottomNav) {
             LiquidGlassBottomBar(
@@ -329,12 +431,13 @@ fun ShadowHuntApp(
                     when (tab) {
                         NavigationTab.HOME -> currentScreen = Screen.Home
                         NavigationTab.PLAY -> {
-                            // Quick Match trigger
-                            val cfg = RoomConfig(code = "SH7KQ2", name = "Cyber Arena", maxPlayers = 8)
-                            activeRoomConfig = cfg
-                            hasActiveRoom = true
-                            engine.initializeRoom(cfg, userProfile.nickname, userProfile.avatarId)
-                            currentScreen = Screen.Lobby
+                            permissionLauncher.launch(
+                                arrayOf(
+                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                                    Manifest.permission.CAMERA
+                                )
+                            )
                         }
                         NavigationTab.FRIENDS -> currentScreen = Screen.Friends
                         NavigationTab.PROFILE -> currentScreen = Screen.Profile

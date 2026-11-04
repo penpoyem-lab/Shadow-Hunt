@@ -121,7 +121,8 @@ data class BustedCard(
     val captureTimeFormatted: String,
     val roomCode: String,
     val achievementTitle: String = "Rookie Runner",
-    val dateText: String = "Today"
+    val dateText: String = "Today",
+    val capturedPhotoPath: String? = null
 )
 
 data class AchievementItem(
