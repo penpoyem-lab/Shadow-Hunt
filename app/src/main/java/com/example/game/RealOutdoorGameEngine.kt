@@ -3,9 +3,9 @@ package com.example.game
 import android.location.Location
 import android.os.SystemClock
 import com.example.audio.GameSoundEffects
+import com.example.data.FirestoreGameRepository
 import com.example.location.LiveLocationManager
 import com.example.model.*
-import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,6 +17,8 @@ class RealOutdoorGameEngine(
     private val locationManager: LiveLocationManager,
     private val soundEffects: GameSoundEffects
 ) {
+    private val firestoreRepo = FirestoreGameRepository()
+
     private val _players = MutableStateFlow<List<RealGpsPlayer>>(emptyList())
     val players: StateFlow<List<RealGpsPlayer>> = _players.asStateFlow()
 
@@ -252,6 +254,17 @@ class RealOutdoorGameEngine(
             }
         }
 
+        // Live backend sync with Firestore
+        firestoreRepo.syncPlayerLocation(
+            roomId = roomSettings.roomCode,
+            playerId = local.id,
+            latitude = local.latitude,
+            longitude = local.longitude,
+            accuracy = local.accuracyMeters,
+            role = local.role.name,
+            isTagged = local.isTagged
+        )
+
         _players.value = currentList
     }
 
@@ -343,6 +356,9 @@ class RealOutdoorGameEngine(
             _players.value = currentList
             postAlert("${capturedRunner.nickname} BUSTED! Now joined the hunters!")
 
+            // Publish official BUSTED card to Firestore
+            firestoreRepo.publishBustedCard(roomSettings.roomCode, card)
+
             checkWinCondition()
         }
     }
@@ -375,6 +391,7 @@ class RealOutdoorGameEngine(
         isRunning = false
         engineScope?.cancel()
         engineScope = null
+        firestoreRepo.cleanup()
     }
 
     private fun postAlert(msg: String) {

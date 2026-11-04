@@ -1,0 +1,155 @@
+{
+  "version": 8,
+  "name": "Shadow Hunt Dark Tactical",
+  "metadata": {
+    "maplibregl:renderer": "webgl",
+    "theme": "cyberpunk_dark_tactical",
+    "author": "Shadow Hunt Team"
+  },
+  "sources": {
+    "osm-tactical-raster": {
+      "type": "raster",
+      "tiles": [
+        "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png",
+        "https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png",
+        "https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png",
+        "https://d.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png"
+      ],
+      "tileSize": 256,
+      "attribution": "&copy; OpenStreetMap contributors &copy; CARTO",
+      "maxzoom": 20
+    },
+    "safe-zone-source": {
+      "type": "geojson",
+      "data": {
+        "type": "FeatureCollection",
+        "features": []
+      }
+    },
+    "players-source": {
+      "type": "geojson",
+      "data": {
+        "type": "FeatureCollection",
+        "features": []
+      }
+    }
+  },
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#070a13"
+      }
+    },
+    {
+      "id": "osm-tiles",
+      "type": "raster",
+      "source": "osm-tactical-raster",
+      "paint": {
+        "raster-opacity": 0.95,
+        "raster-contrast": 0.35,
+        "raster-saturation": -0.15,
+        "raster-brightness-min": 0.05,
+        "raster-brightness-max": 0.85
+      }
+    },
+    {
+      "id": "safe-zone-fill",
+      "type": "fill",
+      "source": "safe-zone-source",
+      "filter": ["==", ["get", "type"], "zone-fill"],
+      "paint": {
+        "fill-color": "#ff1744",
+        "fill-opacity": 0.09
+      }
+    },
+    {
+      "id": "safe-zone-border-glow",
+      "type": "line",
+      "source": "safe-zone-source",
+      "filter": ["==", ["get", "type"], "zone-border"],
+      "paint": {
+        "line-color": "#ff1744",
+        "line-width": 8,
+        "line-blur": 6,
+        "line-opacity": 0.65
+      }
+    },
+    {
+      "id": "safe-zone-border",
+      "type": "line",
+      "source": "safe-zone-source",
+      "filter": ["==", ["get", "type"], "zone-border"],
+      "paint": {
+        "line-color": "#ff3366",
+        "line-width": 3,
+        "line-dasharray": [4, 3]
+      }
+    },
+    {
+      "id": "radar-sweep-ring",
+      "type": "line",
+      "source": "safe-zone-source",
+      "filter": ["==", ["get", "type"], "radar-sweep"],
+      "paint": {
+        "line-color": "#00e5ff",
+        "line-width": 2,
+        "line-opacity": 0.4
+      }
+    },
+    {
+      "id": "runners-glow",
+      "type": "circle",
+      "source": "players-source",
+      "filter": ["==", ["get", "role"], "RUNNER"],
+      "paint": {
+        "circle-radius": 16,
+        "circle-color": "#00e5ff",
+        "circle-opacity": 0.3,
+        "circle-blur": 0.8
+      }
+    },
+    {
+      "id": "runners-layer",
+      "type": "circle",
+      "source": "players-source",
+      "filter": ["==", ["get", "role"], "RUNNER"],
+      "paint": {
+        "circle-radius": 8,
+        "circle-color": [
+          "case",
+          ["==", ["get", "isCaught"], true],
+          "#757575",
+          "#00e5ff"
+        ],
+        "circle-stroke-width": 2,
+        "circle-stroke-color": "#ffffff"
+      }
+    },
+    {
+      "id": "seeker-glow",
+      "type": "circle",
+      "source": "players-source",
+      "filter": ["==", ["get", "role"], "SEEKER"],
+      "paint": {
+        "circle-radius": 22,
+        "circle-color": "#ff1744",
+        "circle-opacity": 0.35,
+        "circle-blur": 0.8
+      }
+    },
+    {
+      "id": "seeker-layer",
+      "type": "circle",
+      "source": "players-source",
+      "filter": ["==", ["get", "role"], "SEEKER"],
+      "paint": {
+        "circle-radius": 11,
+        "circle-color": "#ff1744",
+        "circle-stroke-width": 3,
+        "circle-stroke-color": "#ffffff"
+      }
+    }
+  ]
+}

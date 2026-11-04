@@ -27,6 +27,8 @@ import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.model.UserProfileData
 import com.example.ui.components.GlassPanel
+import com.example.ui.components.HeroBannerCarousel
+import com.example.ui.components.BannerSlide
 import com.example.ui.theme.*
 
 /**
@@ -123,34 +125,17 @@ fun HomeScreen(
             }
         }
 
-        // 2. HERO BANNER: Hunter, Moon, Cityline & Radar Scanner
-        Box(
+        // 2. HERO PROMOTIONAL CAROUSEL: 5 Interactive Swipeable Banners with 3D Depth & Glowing Dots
+        HeroBannerCarousel(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(300.dp)
-        ) {
-            Image(
-                painter = painterResource(id = R.drawable.hero_radar_banner),
-                contentDescription = "Shadow Hunt Hunter and Tactical Radar",
-                contentScale = ContentScale.FillWidth,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.TopCenter)
-            )
+                .padding(vertical = 4.dp),
+            onBannerClick = { slide ->
+                onPlayNow()
+            }
+        )
 
-            // Bottom gradient fade into dark background
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(60.dp)
-                    .align(Alignment.BottomCenter)
-                    .background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(Color.Transparent, DarkBackground)
-                        )
-                    )
-            )
-        }
+        Spacer(modifier = Modifier.height(10.dp))
 
         // 3. ACTION CONTROLS SECTION (Matching IMG_20261104_102912.png)
         Column(

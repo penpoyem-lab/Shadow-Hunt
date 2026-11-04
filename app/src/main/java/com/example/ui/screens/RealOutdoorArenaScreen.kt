@@ -28,6 +28,7 @@ import com.example.ui.components.GlassPanel
 import com.example.ui.components.NeonGamingButton
 import com.example.ui.map.DarkTacticalMap
 import com.example.ui.map.LeafletMapView
+import com.example.ui.map.MapLibreMapView
 import com.example.ui.theme.*
 import java.io.File
 import kotlin.math.sin
@@ -58,7 +59,7 @@ fun RealOutdoorArenaScreen(
 
     var miniMapMode by remember { mutableStateOf(MiniMapDisplayMode.CORNER) }
     var isCameraActive by remember { mutableStateOf(false) }
-    var useLeafletMap by remember { mutableStateOf(true) }
+    var useMapLibreMap by remember { mutableStateOf(true) }
 
     // Pulsing Urgency Animation synchronized with timer
     val countdown = safeZone.countdownSeconds
@@ -122,9 +123,9 @@ fun RealOutdoorArenaScreen(
             .fillMaxSize()
             .background(DarkBackground)
     ) {
-        // 1. DUAL MAP ENGINE: OPENSTREETMAP LEAFLET TACTICAL TILES OR NATIVE CANVAS RADAR
-        if (useLeafletMap) {
-            LeafletMapView(
+        // 1. DUAL MAP ENGINE: OPENSTREETMAP MAPLIBRE TACTICAL TILES OR NATIVE CANVAS RADAR
+        if (useMapLibreMap) {
+            MapLibreMapView(
                 modifier = Modifier.fillMaxSize(),
                 userLatitude = userLat,
                 userLongitude = userLon,
@@ -179,26 +180,26 @@ fun RealOutdoorArenaScreen(
                     Icon(imageVector = Icons.Default.Pause, contentDescription = "Exit", tint = Color.White)
                 }
 
-                // Map Engine Switch (Leaflet OSM vs Radar)
+                // Map Engine Switch (MapLibre Tactical vs Radar)
                 Surface(
-                    onClick = { useLeafletMap = !useLeafletMap },
+                    onClick = { useMapLibreMap = !useMapLibreMap },
                     shape = RoundedCornerShape(14.dp),
-                    color = if (useLeafletMap) ElectricBlue.copy(alpha = 0.25f) else DarkSurfaceGlass,
-                    border = BorderStroke(1.dp, if (useLeafletMap) ElectricBlue else DarkCardBorder)
+                    color = if (useMapLibreMap) ElectricBlue.copy(alpha = 0.25f) else DarkSurfaceGlass,
+                    border = BorderStroke(1.dp, if (useMapLibreMap) ElectricBlue else DarkCardBorder)
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            imageVector = if (useLeafletMap) Icons.Default.Map else Icons.Default.Radar,
+                            imageVector = if (useMapLibreMap) Icons.Default.Map else Icons.Default.Radar,
                             contentDescription = "Map Mode",
-                            tint = if (useLeafletMap) ElectricBlue else NeonRed,
+                            tint = if (useMapLibreMap) ElectricBlue else NeonRed,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = if (useLeafletMap) "OSM MAP" else "RADAR",
+                            text = if (useMapLibreMap) "MAPLIBRE" else "RADAR",
                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                             color = Color.White
                         )

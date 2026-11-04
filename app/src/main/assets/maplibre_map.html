@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Shadow Hunt MapLibre Tactical Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" />
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    html, body, #map {
+      width: 100%;
+      height: 100%;
+      background: #070a13;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    /* MapLibre Canvas Container */
+    .maplibregl-canvas {
+      outline: none;
+    }
+
+    /* HUD Tactical Overlay */
+    .hud-tactical-badge {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      z-index: 10;
+      background: rgba(7, 10, 19, 0.88);
+      border: 1px solid rgba(0, 229, 255, 0.4);
+      border-radius: 10px;
+      padding: 6px 14px;
+      color: #00e5ff;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+      backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .hud-tactical-badge .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #00e676;
+      box-shadow: 0 0 8px #00e676;
+      animation: pulseDot 1.5s infinite;
+    }
+    @keyframes pulseDot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.8); }
+    }
+    .hud-tactical-badge span {
+      color: #ffffff;
+    }
+
+    /* Pulsing user marker */
+    .local-player-marker {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      position: relative;
+    }
+    .local-player-marker.seeker {
+      background: radial-gradient(circle, #ff1744 30%, #b71c1c 90%);
+      border: 2.5px solid #ffffff;
+      box-shadow: 0 0 16px #ff1744, 0 0 28px rgba(255, 23, 68, 0.7);
+    }
+    .local-player-marker.runner {
+      background: radial-gradient(circle, #00e5ff 30%, #0091ea 90%);
+      border: 2.5px solid #ffffff;
+      box-shadow: 0 0 16px #00e5ff, 0 0 28px rgba(0, 229, 255, 0.7);
+    }
+    .pulse-ring {
+      position: absolute;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      border: 2px solid rgba(0, 229, 255, 0.8);
+      animation: mapRing 2s infinite ease-out;
+      pointer-events: none;
+    }
+    @keyframes mapRing {
+      0% { transform: scale(0.6); opacity: 1; }
+      100% { transform: scale(2.2); opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div class="hud-tactical-badge">
+    <div class="dot"></div>
+    <div>MAPLIBRE TACTICAL GPS | <span id="hudZone">ZONE: 400m</span></div>
+  </div>
+
+  <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+  <script>
+    var map;
+    var userMarker = null;
+    var currentRole = "SEEKER";
+    var userCoords = [ -122.4194, 37.7749 ]; // [lng, lat]
+    var safeZoneCenter = [ -122.4194, 37.7749 ];
+    var currentRadiusMeters = 400;
+
+    // Helper: generate GeoJSON circle polygon
+    function createGeoJSONCircle(center, radiusInMeters, points) {
+      if (!points) points = 64;
+      var coords = {
+        latitude: center[1],
+        longitude: center[0]
+      };
+      var km = radiusInMeters / 1000;
+      var ret = [];
+      var distanceX = km / (111.320 * Math.cos(coords.latitude * Math.PI / 180));
+      var distanceY = km / 110.574;
+
+      for (var i = 0; i < points; i++) {
+        var theta = (i / points) * (2 * Math.PI);
+        var x = distanceX * Math.cos(theta);
+        var y = distanceY * Math.sin(theta);
+        ret.push([coords.longitude + x, coords.latitude + y]);
+      }
+      ret.push(ret[0]);
+      return ret;
+    }
+
+    function initMapLibre(initialLat, initialLng, initialZoom) {
+      var lat = initialLat || 37.7749;
+      var lng = initialLng || -122.4194;
+      userCoords = [lng, lat];
+      safeZoneCenter = [lng, lat];
+
+      // Fetch the dark tactical tileset JSON style
+      fetch('dark_tactical_tileset.json')
+        .then(function(response) {
+          if (!response.ok) throw new Error('Style load fallback');
+          return response.json();
+        })
+        .then(function(styleJson) {
+          loadMapWithStyle(styleJson, lat, lng, initialZoom || 17);
+        })
+        .catch(function(err) {
+          // Fallback direct style configuration if fetch blocked
+          loadFallbackStyle(lat, lng, initialZoom || 17);
+        });
+    }
+
+    function loadMapWithStyle(styleJson, lat, lng, zoom) {
+      map = new maplibregl.Map({
+        container: 'map',
+        style: styleJson,
+        center: [lng, lat],
+        zoom: zoom,
+        pitch: 35, // Cyberpunk tilted tactical angle
+        bearing: -10,
+        attributionControl: false
+      });
+
+      map.on('load', function() {
+        setupMapLayers();
+        if (window.AndroidBridge && window.AndroidBridge.onMapReady) {
+          window.AndroidBridge.onMapReady();
+        }
+      });
+    }
+
+    function loadFallbackStyle(lat, lng, zoom) {
+      map = new maplibregl.Map({
+        container: 'map',
+        style: {
+          version: 8,
+          sources: {
+            'osm-raster': {
+              type: 'raster',
+              tiles: ['https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'],
+              tileSize: 256
+            },
+            'safe-zone-source': {
+              type: 'geojson',
+              data: { type: 'FeatureCollection', features: [] }
+            },
+            'players-source': {
+              type: 'geojson',
+              data: { type: 'FeatureCollection', features: [] }
+            }
+          },
+          layers: [
+            { id: 'bg', type: 'background', paint: { 'background-color': '#070a13' } },
+            { id: 'osm', type: 'raster', source: 'osm-raster', paint: { 'raster-contrast': 0.3 } },
+            { id: 'safe-fill', type: 'fill', source: 'safe-zone-source', paint: { 'fill-color': '#ff1744', 'fill-opacity': 0.09 } },
+            { id: 'safe-line', type: 'line', source: 'safe-zone-source', paint: { 'line-color': '#ff1744', 'line-width': 3 } },
+            { id: 'runners-pts', type: 'circle', source: 'players-source', paint: { 'circle-radius': 9, 'circle-color': '#00e5ff', 'circle-stroke-width': 2, 'circle-stroke-color': '#fff' } }
+          ]
+        },
+        center: [lng, lat],
+        zoom: zoom,
+        pitch: 35,
+        attributionControl: false
+      });
+
+      map.on('load', function() {
+        setupMapLayers();
+        if (window.AndroidBridge && window.AndroidBridge.onMapReady) {
+          window.AndroidBridge.onMapReady();
+        }
+      });
+    }
+
+    function setupMapLayers() {
+      updateSafeZoneGeoJSON();
+    }
+
+    function updateSafeZoneGeoJSON() {
+      if (!map || !map.getSource('safe-zone-source')) return;
+
+      var circleCoords = createGeoJSONCircle(safeZoneCenter, currentRadiusMeters);
+      var geojsonData = {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: { type: 'zone-fill' },
+            geometry: {
+              type: 'Polygon',
+              coordinates: [circleCoords]
+            }
+          },
+          {
+            type: 'Feature',
+            properties: { type: 'zone-border' },
+            geometry: {
+              type: 'LineString',
+              coordinates: circleCoords
+            }
+          }
+        ]
+      };
+
+      map.getSource('safe-zone-source').setData(geojsonData);
+    }
+
+    // JS Bridge Functions invoked from Android Kotlin
+    function setPlayerRole(role) {
+      currentRole = role;
+    }
+
+    function updatePlayerLocation(lat, lng, heading) {
+      userCoords = [lng, lat];
+      if (!map) return;
+
+      if (!userMarker) {
+        var el = document.createElement('div');
+        el.className = 'local-player-marker ' + (currentRole === 'SEEKER' ? 'seeker' : 'runner');
+        el.innerHTML = '<div class="pulse-ring"></div>' + (currentRole === 'SEEKER' ? '🎯' : '🏃');
+
+        userMarker = new maplibregl.Marker({ element: el })
+          .setLngLat([lng, lat])
+          .addTo(map);
+
+        map.flyTo({ center: [lng, lat], zoom: 17.5, speed: 1.2 });
+      } else {
+        userMarker.setLngLat([lng, lat]);
+      }
+    }
+
+    function updateSafeZone(lat, lng, radiusMeters, stageName) {
+      safeZoneCenter = [lng, lat];
+      currentRadiusMeters = radiusMeters;
+      updateSafeZoneGeoJSON();
+
+      var hud = document.getElementById('hudZone');
+      if (hud) {
+        hud.innerText = 'ZONE: ' + Math.round(radiusMeters) + 'm (' + (stageName || 'Active') + ')';
+      }
+    }
+
+    function updateRunners(runnersList) {
+      if (!map || !map.getSource('players-source')) return;
+
+      var features = [];
+      if (Array.isArray(runnersList)) {
+        runnersList.forEach(function(r) {
+          features.push({
+            type: 'Feature',
+            properties: {
+              id: r.id,
+              name: r.name,
+              role: r.role || 'RUNNER',
+              isCaught: r.isCaught === true
+            },
+            geometry: {
+              type: 'Point',
+              coordinates: [r.lng, r.lat]
+            }
+          });
+        });
+      }
+
+      map.getSource('players-source').setData({
+        type: 'FeatureCollection',
+        features: features
+      });
+    }
+
+    function triggerRadarPulse() {
+      var rings = document.querySelectorAll('.pulse-ring');
+      rings.forEach(function(r) {
+        r.style.animation = 'none';
+        r.offsetHeight;
+        r.style.animation = 'mapRing 1.5s ease-out';
+      });
+    }
+
+    window.addEventListener('DOMContentLoaded', function() {
+      initMapLibre(37.7749, -122.4194, 17);
+    });
+  </script>
+</body>
+</html>
