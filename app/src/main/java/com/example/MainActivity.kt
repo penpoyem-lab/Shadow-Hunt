@@ -189,19 +189,16 @@ fun ShadowHuntApp(
         }
     }
 
-    // Handle Back Button navigation
-    BackHandler(enabled = currentScreen != Screen.Home && currentScreen != Screen.Login) {
+    // Handle Back Button navigation (Arena and OutdoorArena manage their own match lockdown)
+    BackHandler(
+        enabled = currentScreen != Screen.Home &&
+                currentScreen != Screen.Login &&
+                currentScreen != Screen.Arena &&
+                currentScreen != Screen.OutdoorArena
+    ) {
         when (currentScreen) {
             Screen.CreateRoom, Screen.JoinRoom -> currentScreen = Screen.Home
             Screen.Lobby -> currentScreen = Screen.Home
-            Screen.Arena -> {
-                engine.stopGame()
-                currentScreen = Screen.Lobby
-            }
-            Screen.OutdoorArena -> {
-                outdoorEngine.stopGame()
-                currentScreen = Screen.Home
-            }
             Screen.GameEnd -> currentScreen = Screen.Home
             Screen.Profile, Screen.LastWall, Screen.Friends -> {
                 selectedTab = NavigationTab.HOME

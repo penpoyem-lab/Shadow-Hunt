@@ -26,10 +26,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.model.UserProfileData
-import com.example.ui.components.GlassPanel
-import com.example.ui.components.HeroBannerCarousel
 import com.example.ui.components.BannerSlide
+import com.example.ui.components.GlassPanel
+import com.example.ui.components.GooglePlayPullToRefresh
+import com.example.ui.components.HeroBannerCarousel
 import com.example.ui.theme.*
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * Shadow Hunt Home Screen matching IMG_20261104_102912.png

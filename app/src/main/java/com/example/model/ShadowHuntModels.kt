@@ -110,7 +110,9 @@ data class RoomConfig(
     val arenaId: String = "neon_city",
     val shrinkSpeed: String = "Normal",
     val hintFrequencySeconds: Int = 30,
-    val isPrivate: Boolean = true
+    val isPrivate: Boolean = true,
+    val safeZoneRadiusMeters: Float = 350f,
+    val safeZoneStages: Int = 5
 )
 
 data class BustedCard(

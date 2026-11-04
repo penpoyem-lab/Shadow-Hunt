@@ -38,6 +38,9 @@ fun CreateRoomScreen(
     var selectedArenaId by remember { mutableStateOf("neon_city") }
     var shrinkSpeed by remember { mutableStateOf("Normal") }
     var hintFrequency by remember { mutableIntStateOf(30) }
+    var safeZoneRadius by remember { mutableFloatStateOf(350f) }
+    var safeZoneStages by remember { mutableIntStateOf(5) }
+    var showAdjustSafeZoneDialog by remember { mutableStateOf(false) }
 
     val scrollState = rememberScrollState()
 
@@ -384,6 +387,50 @@ fun CreateRoomScreen(
                         }
                     )
 
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // ADJUST SAFE ZONE BUTTON
+                    Surface(
+                        onClick = { showAdjustSafeZoneDialog = true },
+                        shape = RoundedCornerShape(14.dp),
+                        color = Color(0x1E00E5FF),
+                        border = BorderStroke(1.2.dp, ElectricBlue),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Tune,
+                                    contentDescription = null,
+                                    tint = ElectricBlue,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        text = "ADJUST SAFE ZONE",
+                                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black),
+                                        color = Color.White
+                                    )
+                                    Text(
+                                        text = "Radius: ${safeZoneRadius.toInt()}m • $safeZoneStages Phases",
+                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                        color = ElectricBlue
+                                    )
+                                }
+                            }
+                            Icon(
+                                imageVector = Icons.Default.ChevronRight,
+                                contentDescription = null,
+                                tint = ElectricBlue
+                            )
+                        }
+                    }
+
                     HorizontalDivider(
                         modifier = Modifier.padding(vertical = 12.dp),
                         color = DarkCardBorder
@@ -444,7 +491,9 @@ fun CreateRoomScreen(
                         arenaId = selectedArenaId,
                         shrinkSpeed = shrinkSpeed,
                         hintFrequencySeconds = hintFrequency,
-                        isPrivate = isPrivate
+                        isPrivate = isPrivate,
+                        safeZoneRadiusMeters = safeZoneRadius,
+                        safeZoneStages = safeZoneStages
                     )
                     onCreateGame(config, nickname, selectedAvatarId)
                 },
@@ -470,6 +519,22 @@ fun CreateRoomScreen(
                     color = TextSecondary
                 )
             }
+        }
+
+        // Interactive Adjust Safe Zone Dialog
+        if (showAdjustSafeZoneDialog) {
+            AdjustSafeZoneDialog(
+                initialRadiusMeters = safeZoneRadius,
+                initialStages = safeZoneStages,
+                initialSpeed = shrinkSpeed,
+                onDismiss = { showAdjustSafeZoneDialog = false },
+                onApply = { newRadius, newStages, newSpeed ->
+                    safeZoneRadius = newRadius
+                    safeZoneStages = newStages
+                    shrinkSpeed = newSpeed
+                    showAdjustSafeZoneDialog = false
+                }
+            )
         }
     }
 }

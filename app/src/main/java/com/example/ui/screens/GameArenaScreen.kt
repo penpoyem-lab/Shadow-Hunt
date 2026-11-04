@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
@@ -53,6 +54,12 @@ fun GameArenaScreen(
 
     // Toggleable Mini-Map Mode
     var miniMapMode by remember { mutableStateOf(MiniMapDisplayMode.CORNER) }
+    var showExitLockDialog by remember { mutableStateOf(false) }
+
+    // Enforce: No one can exit the app when the game is running
+    BackHandler(enabled = gamePhase != GamePhase.GAME_OVER) {
+        showExitLockDialog = true
+    }
 
     // =========================================================================
     // TIMER-SYNCED SAFE ZONE URGENCY & PULSING ANIMATIONS
@@ -386,9 +393,9 @@ fun GameArenaScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Pause / Exit button
+                // Pause / Exit button with match lockdown
                 IconButton(
-                    onClick = onPauseOrExit,
+                    onClick = { showExitLockDialog = true },
                     modifier = Modifier
                         .size(42.dp)
                         .clip(CircleShape)
@@ -936,6 +943,17 @@ fun GameArenaScreen(
                     )
                 }
             }
+        }
+
+        // Active Match Lockdown Exit Dialog
+        if (showExitLockDialog) {
+            GameLockExitDialog(
+                onDismiss = { showExitLockDialog = false },
+                onConfirmForfeit = {
+                    showExitLockDialog = false
+                    onPauseOrExit()
+                }
+            )
         }
     }
 }

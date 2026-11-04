@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
@@ -25,6 +26,7 @@ import com.example.game.RealOutdoorGameEngine
 import com.example.location.LiveLocationManager
 import com.example.model.GamePhase
 import com.example.model.PlayerRole
+import com.example.ui.components.GameLockExitDialog
 import com.example.ui.components.GlassPanel
 import com.example.ui.components.NeonGamingButton
 import com.example.ui.map.DarkTacticalMap
@@ -65,6 +67,12 @@ fun RealOutdoorArenaScreen(
     var isCameraActive by remember { mutableStateOf(false) }
     var useStreetTilesMap by remember { mutableStateOf(false) }
     var recenterTrigger by remember { mutableStateOf(0) }
+    var showExitLockDialog by remember { mutableStateOf(false) }
+
+    // Enforce: No one can exit the app when the game is running
+    BackHandler(enabled = gamePhase != GamePhase.GAME_OVER) {
+        showExitLockDialog = true
+    }
 
     // Pulsing Urgency Animation synchronized with timer
     val countdown = safeZone.countdownSeconds
@@ -191,9 +199,9 @@ fun RealOutdoorArenaScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Exit Button
+                // Exit Button with match lockdown
                 IconButton(
-                    onClick = onPauseOrExit,
+                    onClick = { showExitLockDialog = true },
                     modifier = Modifier
                         .size(42.dp)
                         .clip(CircleShape)
@@ -604,6 +612,17 @@ fun RealOutdoorArenaScreen(
                     )
                 }
             }
+        }
+
+        // Active Match Lockdown Exit Dialog
+        if (showExitLockDialog) {
+            GameLockExitDialog(
+                onDismiss = { showExitLockDialog = false },
+                onConfirmForfeit = {
+                    showExitLockDialog = false
+                    onPauseOrExit()
+                }
+            )
         }
     }
 }
