@@ -1,0 +1,6 @@
+{
+  "name": "Shadow Hunt",
+  "description": "Next-generation real-time multiplayer digital hide & seek game with shrinking safe zone, dynamic radar hints, and collectible busted cards.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
