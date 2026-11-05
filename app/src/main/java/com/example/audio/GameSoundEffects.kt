@@ -79,6 +79,34 @@ class GameSoundEffects(context: Context) {
         vibrateHeavy()
     }
 
+    /**
+     * Triggered when Seeker finds Hider at the accurate same location (proximity <= 8m).
+     * Fires intense siren alert tone and rhythmic double vibration pattern.
+     */
+    fun playTargetLockedHaptic() {
+        if (isSoundEnabled) {
+            CoroutineScope(Dispatchers.Default).launch {
+                try {
+                    toneGenerator?.startTone(ToneGenerator.TONE_CDMA_HIGH_L, 200)
+                    kotlinx.coroutines.delay(150)
+                    toneGenerator?.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 350)
+                } catch (_: Exception) {}
+            }
+        }
+        if (isHapticsEnabled && vibrator != null && vibrator.hasVibrator()) {
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    val timings = longArrayOf(0, 150, 100, 250, 100, 300)
+                    val amplitudes = intArrayOf(0, 255, 0, 255, 0, 255)
+                    vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
+                } else {
+                    @Suppress("DEPRECATION")
+                    vibrator.vibrate(500)
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
     fun playVictory() {
         if (!isSoundEnabled) return
         CoroutineScope(Dispatchers.Default).launch {

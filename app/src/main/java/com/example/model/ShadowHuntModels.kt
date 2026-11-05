@@ -111,7 +111,7 @@ data class RoomConfig(
     val shrinkSpeed: String = "Normal",
     val hintFrequencySeconds: Int = 30,
     val isPrivate: Boolean = true,
-    val safeZoneRadiusMeters: Float = 350f,
+    val safeZoneRadiusMeters: Float = 1000f,
     val safeZoneStages: Int = 5
 )
 

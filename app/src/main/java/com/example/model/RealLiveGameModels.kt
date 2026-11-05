@@ -20,9 +20,9 @@ data class RealGpsPlayer(
 data class RealGpsSafeZone(
     var centerLatitude: Double = 37.7749,
     var centerLongitude: Double = -122.4194,
-    var initialRadiusMeters: Float = 400f,
-    var currentRadiusMeters: Float = 400f,
-    var targetRadiusMeters: Float = 400f,
+    var initialRadiusMeters: Float = 1000f, // Minimum 1km (1000 meters)
+    var currentRadiusMeters: Float = 1000f,
+    var targetRadiusMeters: Float = 1000f,
     var stage: Int = 1,
     var totalStages: Int = 5,
     var countdownSeconds: Int = 45,
@@ -43,11 +43,11 @@ data class LiveBustedCard(
 
 data class LiveRoomSettings(
     val roomCode: String = "SH7KQ2",
-    val roomName: String = "Outdoor Park Hunt",
+    val roomName: String = "Outdoor GPS Satellite Hunt",
     val hostId: String = "host",
     var centerLatitude: Double = 37.7749,
     var centerLongitude: Double = -122.4194,
-    val initialRadiusMeters: Float = 400f,
+    val initialRadiusMeters: Float = 1000f, // Minimum 1km (1000m)
     val durationMinutes: Int = 10,
     val shrinkSpeed: String = "Normal",
     val hintBlinkSeconds: Int = 90, // Exactly 1:30 minutes between radar pings

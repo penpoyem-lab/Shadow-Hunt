@@ -76,10 +76,13 @@ fun DarkTacticalMap(
     shockwaveAlpha: Float,
     shockwaveExpansionDp: androidx.compose.ui.unit.Dp,
     recenterTrigger: Int = 0,
+    userAccuracyMeters: Float = 6f,
+    userSpeedMps: Float = 0f,
     modifier: Modifier = Modifier
 ) {
-    var selectedLayer by remember { mutableStateOf(MapLayerType.TACTICAL_NEON) }
-    var zoomLevel by remember { mutableFloatStateOf(16.5f) }
+    var selectedLayer by remember { mutableStateOf(MapLayerType.SATELLITE) }
+    // High-detail street-level zoom showing buildings, paths, alleys, and roads
+    var zoomLevel by remember { mutableFloatStateOf(17.8f) }
     var panOffsetX by remember { mutableFloatStateOf(0f) }
     var panOffsetY by remember { mutableFloatStateOf(0f) }
 
@@ -103,7 +106,7 @@ fun DarkTacticalMap(
         if (recenterTrigger > 0) {
             panOffsetX = 0f
             panOffsetY = 0f
-            zoomLevel = 16.5f
+            zoomLevel = 17.8f
         }
     }
 
@@ -120,7 +123,7 @@ fun DarkTacticalMap(
             .background(Color(0xFF060A14))
             .pointerInput(Unit) {
                 detectTransformGestures { _, pan, zoom, _ ->
-                    zoomLevel = (zoomLevel * zoom).coerceIn(13.5f, 19.5f)
+                    zoomLevel = (zoomLevel * zoom).coerceIn(14.0f, 20.0f)
                     panOffsetX += pan.x
                     panOffsetY += pan.y
                 }
@@ -310,9 +313,8 @@ fun DarkTacticalMap(
                     val pScreen = latLonToScreen(player.latitude, player.longitude)
 
                     if (player.role == PlayerRole.SEEKER) {
-                        // Seeker/Hunter: Visible to Hiders during 1:30 radar reveal (sonarActive) OR if seeker is nearby (< 35m) OR if local player is also seeker
-                        val distToLocal = LiveLocationManager.distanceMeters(userLatitude, userLongitude, player.latitude, player.longitude)
-                        val isSeekerVisible = isSeeker || sonarActive || distToLocal <= 35f
+                        // Seeker/Hunter: Visible to Hiders ONLY during 1:30 radar reveal (sonarActive). Otherwise strictly NOT visible!
+                        val isSeekerVisible = isSeeker || sonarActive
 
                         if (isSeekerVisible) {
                             val captureHaloRadiusPx = metersToPixels(20f)
@@ -343,19 +345,10 @@ fun DarkTacticalMap(
                                 radius = 3.5.dp.toPx(),
                                 center = pScreen
                             )
-                        } else {
-                            // Faint danger blip if seeker is within 70m
-                            if (distToLocal <= 70f) {
-                                drawCircle(
-                                    color = Color(0x22FF1744),
-                                    radius = 6.dp.toPx(),
-                                    center = pScreen
-                                )
-                            }
                         }
                     } else {
-                        // Runner/Hider: Visible to Seekers during 1:30 radar reveal (sonarActive) OR if local player is also runner
-                        val isRunnerVisible = sonarActive || !isSeeker || player.lastBlinkVisible
+                        // Runner/Hider: Visible to Seekers ONLY during 1:30 radar reveal (sonarActive). Otherwise strictly NOT visible!
+                        val isRunnerVisible = (!isSeeker) || sonarActive
                         if (isRunnerVisible) {
                             // Green glowing pin
                             drawCircle(
@@ -371,13 +364,6 @@ fun DarkTacticalMap(
                             drawCircle(
                                 color = Color.White,
                                 radius = 3.5.dp.toPx(),
-                                center = pScreen
-                            )
-                        } else {
-                            // Faint ghost blip during stealth phase
-                            drawCircle(
-                                color = Color(0x1800E5FF),
-                                radius = 5.dp.toPx(),
                                 center = pScreen
                             )
                         }
@@ -401,7 +387,26 @@ fun DarkTacticalMap(
                 )
             }
 
-            // 5. CENTRAL USER MARKER (Bright Yellow Glowing Dot + Heading Beam, Screenshot 4)
+            // 5. DYNAMIC GLOWING ACCURACY RING (Real GPS Tolerance Halo)
+            val accuracyPx = metersToPixels(userAccuracyMeters.coerceIn(3f, 45f))
+            // Soft cyan-blue accuracy fill
+            drawCircle(
+                color = Color(0x1800E5FF),
+                radius = accuracyPx,
+                center = userScreen
+            )
+            // Glowing dashed accuracy perimeter
+            drawCircle(
+                color = Color(0x8800E5FF),
+                radius = accuracyPx,
+                center = userScreen,
+                style = Stroke(
+                    width = 1.5.dp.toPx(),
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 6f), pulseProgress * 14f)
+                )
+            )
+
+            // 6. CENTRAL USER MARKER (Bright Yellow Glowing Dot + Heading Beam, Screenshot 4)
             // Outer golden aura
             drawCircle(
                 color = Color(0x44FFEA00),
@@ -504,7 +509,7 @@ fun DarkTacticalMap(
 
             // Zoom In (+) Button
             Surface(
-                onClick = { zoomLevel = (zoomLevel + 0.6f).coerceAtMost(19.5f) },
+                onClick = { zoomLevel = (zoomLevel + 0.6f).coerceAtMost(20.0f) },
                 shape = CircleShape,
                 color = Color(0xEE090D18),
                 border = BorderStroke(1.5.dp, Color(0xFF28324E)),
@@ -522,7 +527,7 @@ fun DarkTacticalMap(
 
             // Zoom Out (-) Button
             Surface(
-                onClick = { zoomLevel = (zoomLevel - 0.6f).coerceAtMost(19.5f).coerceAtLeast(13.5f) },
+                onClick = { zoomLevel = (zoomLevel - 0.6f).coerceAtMost(20.0f).coerceAtLeast(14.0f) },
                 shape = CircleShape,
                 color = Color(0xEE090D18),
                 border = BorderStroke(1.5.dp, Color(0xFF28324E)),
@@ -534,6 +539,58 @@ fun DarkTacticalMap(
                         contentDescription = "Zoom Out",
                         tint = Color.White,
                         modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+        }
+
+        // 4. BOTTOM-LEFT LIVE GPS PRECISION BADGE
+        Surface(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 16.dp, bottom = 120.dp),
+            shape = RoundedCornerShape(14.dp),
+            color = Color(0xDD090D18),
+            border = BorderStroke(1.2.dp, Color(0xFF28324E))
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .clip(CircleShape)
+                            .background(if (userAccuracyMeters <= 10f) NeonGreen else GoldAccent)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "GPS PRECISION ±${userAccuracyMeters.toInt()}m",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Black,
+                            fontSize = 9.sp,
+                            letterSpacing = 0.5.sp
+                        ),
+                        color = Color.White
+                    )
+                }
+                Text(
+                    text = if (userLatitude != 0.0) String.format("%.5f° N, %.5f° E", userLatitude, userLongitude) else "SEARCHING FIX...",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 8.5.sp,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                    ),
+                    color = Color(0xFF90A4AE)
+                )
+                if (userSpeedMps > 0.5f) {
+                    Text(
+                        text = "SPEED: ${String.format("%.1f", userSpeedMps * 3.6f)} km/h",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 8.5.sp
+                        ),
+                        color = ElectricBlue
                     )
                 }
             }

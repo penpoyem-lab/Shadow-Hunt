@@ -32,6 +32,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
@@ -510,8 +511,13 @@ fun RoomQrCodeDialog(
                     } else {
                         // High-contrast procedural fallback
                         Canvas(modifier = Modifier.fillMaxSize()) {
-                            drawRect(Color.White)
-                            drawRect(Color.Black, Offset(20f, 20f), Size(size.width - 40f, size.height - 40f), Stroke(4.dp.toPx()))
+                            drawRect(color = Color.White)
+                            drawRect(
+                                color = Color.Black,
+                                topLeft = Offset(20f, 20f),
+                                size = Size(size.width - 40f, size.height - 40f),
+                                style = Stroke(4.dp.toPx())
+                            )
                         }
                     }
                 }

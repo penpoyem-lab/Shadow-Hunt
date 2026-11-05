@@ -3,6 +3,7 @@ package com.example
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -252,7 +253,6 @@ fun ShadowHuntApp(
                     },
                     onRejoinRoom = {
                         soundEffects.playClick()
-                        activeOutdoorSettings = activeOutdoorSettings.copy(roomCode = "SH7KQ2")
                         permissionLauncher.launch(
                             arrayOf(
                                 Manifest.permission.ACCESS_FINE_LOCATION,
@@ -262,7 +262,13 @@ fun ShadowHuntApp(
                         )
                     },
                     hasActiveRoom = true,
-                    activeRoomCode = "SH7KQ2",
+                    activeRoomCode = activeOutdoorSettings.roomCode,
+                    onRefreshRoomCode = {
+                        val freshCode = "SH" + (1000..9999).random().toString()
+                        activeOutdoorSettings = activeOutdoorSettings.copy(roomCode = freshCode)
+                        activeRoomConfig = activeRoomConfig.copy(code = freshCode)
+                        Toast.makeText(context, "Refreshed: New Room Code & QR ($freshCode)", Toast.LENGTH_SHORT).show()
+                    },
                     onOpenProfile = {
                         selectedTab = NavigationTab.PROFILE
                         currentScreen = Screen.Profile
@@ -286,7 +292,7 @@ fun ShadowHuntApp(
                             roomCode = config.code,
                             roomName = config.name,
                             durationMinutes = config.durationMinutes,
-                            initialRadiusMeters = 400f,
+                            initialRadiusMeters = config.safeZoneRadiusMeters.coerceAtLeast(1000f),
                             shrinkSpeed = config.shrinkSpeed
                         )
                         engine.initializeRoom(config, nickname, avatarId)
@@ -309,7 +315,7 @@ fun ShadowHuntApp(
                             roomCode = code,
                             roomName = "Live Room $code"
                         )
-                        engine.initializeRoom(joinedConfig, nickname, avatarId)
+                        engine.joinExistingRoom(joinedConfig, nickname, avatarId)
                         currentScreen = Screen.Lobby
                     }
                 )
@@ -322,19 +328,24 @@ fun ShadowHuntApp(
                         currentScreen = Screen.Home
                     },
                     onStartGame = {
-                        permissionLauncher.launch(
-                            arrayOf(
-                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                Manifest.permission.ACCESS_COARSE_LOCATION,
-                                Manifest.permission.CAMERA
+                        if (players.size >= 3) {
+                            permissionLauncher.launch(
+                                arrayOf(
+                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                                    Manifest.permission.CAMERA
+                                )
                             )
-                        )
+                        } else {
+                            Toast.makeText(context, "Minimum 3 players required! Invite squad members via Room Code or QR scanner.", Toast.LENGTH_LONG).show()
+                        }
                     },
                     onToggleReady = {
                         soundEffects.playClick()
                     },
                     onAddBot = {
                         soundEffects.playClick()
+                        engine.addSquadMember()
                     }
                 )
             }

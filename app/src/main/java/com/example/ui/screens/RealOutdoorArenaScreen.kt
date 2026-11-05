@@ -118,17 +118,8 @@ fun RealOutdoorArenaScreen(
         )
     } else 0f
 
-    LaunchedEffect(userLat, userLon) {
-        if (userLat != 0.0 && userLon != 0.0) {
-            val dist = LiveLocationManager.distanceMeters(
-                userLat, userLon,
-                safeZone.centerLatitude, safeZone.centerLongitude
-            )
-            if (dist > 1200f) {
-                engine.anchorGameToLocation(userLat, userLon)
-            }
-        }
-    }
+    // Safe Circle Zone stays locked to its fixed geographical position
+    // As the player walks/runs in real life, only the player's live GPS marker moves on the map
 
     val distToEdge = distToCenter - safeZone.currentRadiusMeters
     val isInsideSafeZone = distToEdge <= 0f
@@ -183,6 +174,8 @@ fun RealOutdoorArenaScreen(
                 shockwaveAlpha = shockwaveAlpha,
                 shockwaveExpansionDp = shockwaveExpansionDp,
                 recenterTrigger = recenterTrigger,
+                userAccuracyMeters = currentLocation?.accuracy ?: 6f,
+                userSpeedMps = currentLocation?.speed ?: 0f,
                 modifier = Modifier.fillMaxSize()
             )
         }
@@ -211,27 +204,26 @@ fun RealOutdoorArenaScreen(
                     Icon(imageVector = Icons.Default.Pause, contentDescription = "Exit", tint = Color.White)
                 }
 
-                // Map Engine Switch (Native Tactical Radar vs Web Street Tiles)
+                // Live High-Res Satellite View Indicator
                 Surface(
-                    onClick = { useStreetTilesMap = !useStreetTilesMap },
                     shape = RoundedCornerShape(14.dp),
-                    color = if (useStreetTilesMap) ElectricBlue.copy(alpha = 0.25f) else DarkSurfaceGlass,
-                    border = BorderStroke(1.dp, if (useStreetTilesMap) ElectricBlue else DarkCardBorder)
+                    color = NeonGreen.copy(alpha = 0.2f),
+                    border = BorderStroke(1.2.dp, NeonGreen)
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            imageVector = if (useStreetTilesMap) Icons.Default.Map else Icons.Default.Radar,
-                            contentDescription = "Map Mode",
-                            tint = if (useStreetTilesMap) ElectricBlue else NeonRed,
+                            imageVector = Icons.Default.SatelliteAlt,
+                            contentDescription = "Live Satellite View",
+                            tint = NeonGreen,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = if (useStreetTilesMap) "STREET TILES" else "TACTICAL RADAR",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            text = "LIVE SATELLITE",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black),
                             color = Color.White
                         )
                     }
@@ -257,35 +249,6 @@ fun RealOutdoorArenaScreen(
                     }
                 }
 
-                // 1:30 Mutual Radar Reveal Badge
-                Surface(
-                    onClick = { engine.triggerSonarPing() },
-                    shape = RoundedCornerShape(14.dp),
-                    color = if (radarRevealActive) NeonGreen.copy(alpha = 0.25f) else DarkSurfaceGlass,
-                    border = BorderStroke(1.2.dp, if (radarRevealActive) NeonGreen else ElectricBlue)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Sensors,
-                            contentDescription = "Radar Reveal",
-                            tint = if (radarRevealActive) NeonGreen else ElectricBlue,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = if (radarRevealActive) {
-                                "REVEAL: ${radarRevealSecondsLeft}s"
-                            } else {
-                                "PING: %02d:%02d".format(radarCountdown / 60, radarCountdown % 60)
-                            },
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black),
-                            color = if (radarRevealActive) NeonGreen else Color.White
-                        )
-                    }
-                }
 
                 // Players & Minimap Mode Toggle
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -483,9 +446,6 @@ fun RealOutdoorArenaScreen(
             FloatingActionButton(
                 onClick = {
                     recenterTrigger++
-                    if (currentLocation != null) {
-                        engine.anchorGameToLocation(currentLocation!!.latitude, currentLocation!!.longitude)
-                    }
                 },
                 containerColor = Color(0xFF0F1322),
                 contentColor = ElectricBlue,
@@ -497,23 +457,6 @@ fun RealOutdoorArenaScreen(
                 Icon(
                     imageVector = Icons.Default.MyLocation,
                     contentDescription = "Recenter on My Location",
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-
-            // Radar Sonar Ping Scan Button
-            FloatingActionButton(
-                onClick = { engine.triggerSonarPing() },
-                containerColor = Color(0xFF0F1322),
-                contentColor = if (isSeeker) NeonRed else ElectricBlue,
-                shape = CircleShape,
-                modifier = Modifier
-                    .size(48.dp)
-                    .border(1.5.dp, if (isSeeker) NeonRed else ElectricBlue, CircleShape)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Radar,
-                    contentDescription = "Radar Ping",
                     modifier = Modifier.size(24.dp)
                 )
             }

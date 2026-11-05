@@ -186,57 +186,88 @@ fun LobbyScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Share and Show QR buttons
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                Toast.makeText(context, "Invite link copied to clipboard!", Toast.LENGTH_SHORT).show()
-                            },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(44.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = NeonPurple.copy(alpha = 0.25f)),
-                            border = BorderStroke(1.2.dp, NeonPurple),
-                            shape = RoundedCornerShape(14.dp)
+                    if (isHost) {
+                        // Host Only Share & QR Buttons
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Share,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Share Invite",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                color = Color.White
-                            )
-                        }
+                            Button(
+                                onClick = {
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    val clip = ClipData.newPlainText("Shadow Hunt Room", "Join my Shadow Hunt Squad! Code: ${roomConfig.code}\nLink: https://shadowhunt.app/room/${roomConfig.code}")
+                                    clipboard.setPrimaryClip(clip)
+                                    Toast.makeText(context, "Room Code & Link copied (Host share)!", Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(44.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = NeonPurple.copy(alpha = 0.25f)),
+                                border = BorderStroke(1.2.dp, NeonPurple),
+                                shape = RoundedCornerShape(14.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Share,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Share Code",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = Color.White
+                                )
+                            }
 
-                        Button(
-                            onClick = { showRoomQrDialog = true },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(44.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = ElectricBlue.copy(alpha = 0.25f)),
-                            border = BorderStroke(1.2.dp, ElectricBlue),
-                            shape = RoundedCornerShape(14.dp)
+                            Button(
+                                onClick = { showRoomQrDialog = true },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(44.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = ElectricBlue.copy(alpha = 0.25f)),
+                                border = BorderStroke(1.2.dp, ElectricBlue),
+                                shape = RoundedCornerShape(14.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.QrCode,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Show QR",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = Color.White
+                                )
+                            }
+                        }
+                    } else {
+                        // Squad Partner View (Cannot re-share code)
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFF14192A),
+                            border = BorderStroke(1.dp, Color(0xFF283250)),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.QrCode,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Show QR",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                color = Color.White
-                            )
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Lock,
+                                    contentDescription = null,
+                                    tint = GoldAccent,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "PARTNER STATUS: Only the Room Host has permission to share room code & QR. Get ready for host to launch!",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                                    color = Color(0xFFBAC5DC)
+                                )
+                            }
                         }
                     }
                 }
@@ -262,7 +293,7 @@ fun LobbyScreen(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Virtual arena connection is optional. No GPS or real location is required.",
+                    text = "MINIMUM 3 PLAYERS: Share Room Code or QR Scanner to invite squad members. The game will unlock and start when at least 3 players join.",
                     style = MaterialTheme.typography.bodyMedium.copy(fontSize = 11.sp),
                     color = Color(0xFFFFE082)
                 )
@@ -270,19 +301,21 @@ fun LobbyScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // STATUS BANNER
+            // STATUS BANNER (Requires minimum 3 players)
+            val hasEnoughPlayers = players.size >= 3
+            val neededPlayers = (3 - players.size).coerceAtLeast(0)
             val waitingText = if (isStartingCountdown) {
                 "HUNT BEGINS IN: 00:0$countdownSec"
-            } else if (players.size < 2) {
-                "NEED 1 MORE TO START • Waiting for players"
+            } else if (!hasEnoughPlayers) {
+                "WAITING FOR PLAYERS • ${players.size}/3 Joined (Need $neededPlayers more to start)"
             } else {
                 "READY TO HUNT • ${players.size}/${roomConfig.maxPlayers} PLAYERS READY"
             }
 
             GlassPanel(
                 modifier = Modifier.fillMaxWidth(),
-                borderColor = if (players.size >= 2) NeonGreen else NeonRed,
-                backgroundColor = if (players.size >= 2) Color(0x3300E676) else Color(0x33FF1E43),
+                borderColor = if (hasEnoughPlayers) NeonGreen else NeonRed,
+                backgroundColor = if (hasEnoughPlayers) Color(0x3300E676) else Color(0x33FF1E43),
                 shape = RoundedCornerShape(14.dp)
             ) {
                 Row(
@@ -293,9 +326,9 @@ fun LobbyScreen(
                     horizontalArrangement = Arrangement.Center
                 ) {
                     Icon(
-                        imageVector = if (players.size >= 2) Icons.Default.SportsEsports else Icons.Default.HourglassTop,
+                        imageVector = if (hasEnoughPlayers) Icons.Default.SportsEsports else Icons.Default.HourglassTop,
                         contentDescription = null,
-                        tint = if (players.size >= 2) NeonGreen else NeonRed,
+                        tint = if (hasEnoughPlayers) NeonGreen else NeonRed,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -322,11 +355,39 @@ fun LobbyScreen(
                         color = Color.White
                     )
                 }
-                Text(
-                    text = "${players.size} / ${roomConfig.maxPlayers} players",
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                    color = NeonPurple
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (isHost && players.size < roomConfig.maxPlayers) {
+                        Button(
+                            onClick = {
+                                onAddBot()
+                                Toast.makeText(context, "Invited squad partner joined via Room Code ${roomConfig.code}!", Toast.LENGTH_SHORT).show()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = ElectricBlue.copy(alpha = 0.2f)),
+                            border = BorderStroke(1.dp, ElectricBlue),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                            modifier = Modifier.padding(end = 8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.QrCodeScanner,
+                                contentDescription = null,
+                                tint = ElectricBlue,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "+ Join (Code/QR)",
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                                color = ElectricBlue
+                            )
+                        }
+                    }
+                    Text(
+                        text = "${players.size} / ${roomConfig.maxPlayers} players",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                        color = if (players.size >= 3) NeonGreen else NeonPurple
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -406,7 +467,7 @@ fun LobbyScreen(
                     }
                 }
 
-                // Empty Slots with + to invite / add bot
+                // Empty Slots with + to invite / add player via Room Code or QR scanner
                 val emptySlots = (roomConfig.maxPlayers - players.size).coerceAtLeast(0)
                 for (i in 0 until emptySlots) {
                     Column(
@@ -418,14 +479,17 @@ fun LobbyScreen(
                                 .size(76.dp)
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(DarkSurfaceGlass)
-                                .border(1.dp, DarkCardBorder, RoundedCornerShape(16.dp))
-                                .clickable { onAddBot() },
+                                .border(1.dp, if (i == 0 && players.size < 3) ElectricBlue else DarkCardBorder, RoundedCornerShape(16.dp))
+                                .clickable {
+                                    onAddBot()
+                                    Toast.makeText(context, "Squad member joined via Room Code ${roomConfig.code}!", Toast.LENGTH_SHORT).show()
+                                },
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = "Add Bot Player",
-                                tint = TextMuted,
+                                imageVector = Icons.Default.PersonAdd,
+                                contentDescription = "Invite Squad Player",
+                                tint = if (i == 0 && players.size < 3) ElectricBlue else TextMuted,
                                 modifier = Modifier.size(28.dp)
                             )
                         }
@@ -436,8 +500,8 @@ fun LobbyScreen(
                             color = TextMuted
                         )
                         Text(
-                            text = "+ Tap to Add",
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                            text = "+ Invite / Join",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
                             color = ElectricBlue
                         )
                     }
@@ -502,28 +566,57 @@ fun LobbyScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // START GAME BUTTON
+            // START GAME BUTTON (Requires minimum 3 players)
             if (isHost) {
                 NeonGamingButton(
-                    text = if (isStartingCountdown) "STARTING IN $countdownSec..." else "START GAME",
-                    onClick = {
-                        if (players.size < 2) {
-                            onAddBot() // ensure at least 2 players
-                        }
-                        isStartingCountdown = true
+                    text = if (isStartingCountdown) {
+                        "STARTING IN $countdownSec..."
+                    } else if (!hasEnoughPlayers) {
+                        "LOCKED: NEED 3 PLAYERS (${players.size}/3)"
+                    } else {
+                        "START GAME (${players.size} PLAYERS)"
                     },
-                    icon = Icons.Default.PlayArrow,
-                    gradientColors = listOf(Color(0xFFFF1E43), Color(0xFFD50000)),
-                    borderColor = Color(0xFFFF5252),
+                    onClick = {
+                        if (!hasEnoughPlayers) {
+                            Toast.makeText(
+                                context,
+                                "Cannot start match! Minimum 3 players required. Share Room Code ${roomConfig.code} or QR code to invite squad members.",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        } else {
+                            isStartingCountdown = true
+                        }
+                    },
+                    icon = if (hasEnoughPlayers) Icons.Default.PlayArrow else Icons.Default.Lock,
+                    gradientColors = if (hasEnoughPlayers) {
+                        listOf(Color(0xFFFF1E43), Color(0xFFD50000))
+                    } else {
+                        listOf(Color(0xFF263238), Color(0xFF1E2429))
+                    },
+                    borderColor = if (hasEnoughPlayers) Color(0xFFFF5252) else Color(0xFF455A64),
                     height = 58.dp
                 )
             } else {
                 NeonGamingButton(
-                    text = "READY TO PLAY",
-                    onClick = onToggleReady,
-                    icon = Icons.Default.Check,
-                    gradientColors = listOf(Color(0xFF00E676), Color(0xFF00B0FF)),
-                    borderColor = Color(0xFF69F0AE),
+                    text = if (hasEnoughPlayers) "READY TO PLAY" else "WAITING FOR PLAYERS (${players.size}/3)",
+                    onClick = {
+                        if (!hasEnoughPlayers) {
+                            Toast.makeText(
+                                context,
+                                "Waiting for squad! Match starts when at least 3 players join via Room Code or QR scanner.",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        } else {
+                            onToggleReady()
+                        }
+                    },
+                    icon = if (hasEnoughPlayers) Icons.Default.Check else Icons.Default.HourglassEmpty,
+                    gradientColors = if (hasEnoughPlayers) {
+                        listOf(Color(0xFF00E676), Color(0xFF00B0FF))
+                    } else {
+                        listOf(Color(0xFF263238), Color(0xFF1E2429))
+                    },
+                    borderColor = if (hasEnoughPlayers) Color(0xFF69F0AE) else Color(0xFF455A64),
                     height = 58.dp
                 )
             }

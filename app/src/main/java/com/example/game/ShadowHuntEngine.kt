@@ -116,23 +116,13 @@ class ShadowHuntEngine(
         currentRoomConfig = config
         val initialPlayers = mutableListOf<PlayerState>()
 
-        val totalToCreate = config.maxPlayers.coerceIn(2, 10)
-        // Smart random role assignment: 1 seeker for <= 4 players, 2 for 5-8 players, 3 for 9-10
-        val seekerCount = when {
-            totalToCreate <= 4 -> 1
-            totalToCreate <= 8 -> 2
-            else -> 3
-        }
-        val randomSeekerIndices = (0 until totalToCreate).shuffled(Random(System.currentTimeMillis())).take(seekerCount).toSet()
-
-        // Local Player
-        val assignedRole = preferredRole ?: if (randomSeekerIndices.contains(0)) PlayerRole.SEEKER else PlayerRole.RUNNER
+        // Host player starts in the lobby. Minimum 3 players required to start match via room code / QR invite.
         initialPlayers.add(
             PlayerState(
                 id = "p_local",
                 nickname = localPlayerNickname.ifEmpty { "Kishalay_007" },
                 avatarId = localAvatarId,
-                role = assignedRole,
+                role = preferredRole ?: PlayerRole.SEEKER,
                 isHost = true,
                 isReady = true,
                 isBot = false,
@@ -141,33 +131,6 @@ class ShadowHuntEngine(
                 isLocalPlayer = true
             )
         )
-
-        // Bot participants
-        val botNames = listOf("RexHunter", "ShadowKing", "Devil", "Valkyrie", "Ghost", "Cipher", "Phoenix", "Specter", "Zero")
-        val botAvatars = listOf("hunter", "cyber", "phantom", "reaper", "demon")
-
-        for (i in 1 until totalToCreate) {
-            val role = if (randomSeekerIndices.contains(i)) PlayerRole.SEEKER else PlayerRole.RUNNER
-
-            val spawnAngle = (i * 2 * PI / (totalToCreate - 1)).toFloat()
-            val spawnDist = Random.nextFloat() * 200f + 120f
-            val bx = (500f + cos(spawnAngle) * spawnDist).coerceIn(100f, 900f)
-            val by = (500f + sin(spawnAngle) * spawnDist).coerceIn(100f, 900f)
-
-            initialPlayers.add(
-                PlayerState(
-                    id = "bot_$i",
-                    nickname = botNames[(i - 1) % botNames.size],
-                    avatarId = botAvatars[(i - 1) % botAvatars.size],
-                    role = role,
-                    isHost = false,
-                    isReady = true,
-                    isBot = true,
-                    x = bx,
-                    y = by
-                )
-            )
-        }
 
         _players.value = initialPlayers
         _safeZone.value = SafeZoneState(
@@ -185,7 +148,85 @@ class ShadowHuntEngine(
         _lastTaggedCard.value = null
     }
 
+    fun addSquadMember(customNickname: String? = null, customAvatarId: String? = null) {
+        if (_players.value.size >= currentRoomConfig.maxPlayers) return
+        val current = _players.value.toMutableList()
+        val index = current.size + 1
+        val squadNames = listOf("GhostRunner", "ShadowViper", "NeonHunter", "CipherX", "Valkyrie", "ZeroPhantom")
+        val name = customNickname ?: squadNames[(index - 1) % squadNames.size]
+        val avatar = customAvatarId ?: listOf("hunter", "cyber", "phantom", "reaper", "demon")[(index - 1) % 5]
+
+        current.add(
+            PlayerState(
+                id = "p_invited_$index",
+                nickname = name,
+                avatarId = avatar,
+                role = if (index % 2 == 1) PlayerRole.RUNNER else PlayerRole.SEEKER,
+                isHost = false,
+                isReady = true,
+                isBot = false,
+                x = 500f + Random.nextInt(-120, 120),
+                y = 500f + Random.nextInt(-120, 120)
+            )
+        )
+        _players.value = current
+    }
+
+    fun joinExistingRoom(config: RoomConfig, localPlayerNickname: String, localAvatarId: String) {
+        currentRoomConfig = config
+        val current = _players.value.toMutableList()
+        // If room has no host, create squad host first
+        if (current.none { it.isHost }) {
+            current.add(
+                PlayerState(
+                    id = "p_host",
+                    nickname = "SquadHost_${config.code}",
+                    avatarId = "cyber",
+                    role = PlayerRole.SEEKER,
+                    isHost = true,
+                    isReady = true,
+                    isBot = false,
+                    x = 480f,
+                    y = 480f,
+                    isLocalPlayer = false
+                )
+            )
+        }
+        // Add this local player who joined via Room Code or QR scanner
+        current.add(
+            PlayerState(
+                id = "p_local_${System.currentTimeMillis()}",
+                nickname = localPlayerNickname.ifEmpty { "SquadPartner" },
+                avatarId = localAvatarId,
+                role = PlayerRole.RUNNER,
+                isHost = false,
+                isReady = true,
+                isBot = false,
+                x = 520f,
+                y = 510f,
+                isLocalPlayer = true
+            )
+        )
+        _players.value = current
+        _safeZone.value = SafeZoneState()
+        _remainingSeconds.value = config.durationMinutes * 60
+        _gamePhase.value = GamePhase.PREPARATION
+    }
+
     fun startGame() {
+        if (_players.value.size < 3) return
+        val total = _players.value.size
+        val seekerCount = when {
+            total <= 4 -> 1
+            total <= 8 -> 2
+            else -> 3
+        }
+        val randomSeekers = (0 until total).shuffled(Random(System.currentTimeMillis())).take(seekerCount).toSet()
+        val updatedPlayers = _players.value.mapIndexed { index, p ->
+            p.copy(role = if (randomSeekers.contains(index)) PlayerRole.SEEKER else PlayerRole.RUNNER)
+        }
+        _players.value = updatedPlayers
+
         engineScope?.cancel()
         engineScope = CoroutineScope(Dispatchers.Default + Job())
         isRunning = true

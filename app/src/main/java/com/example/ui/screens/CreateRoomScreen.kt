@@ -38,7 +38,7 @@ fun CreateRoomScreen(
     var selectedArenaId by remember { mutableStateOf("neon_city") }
     var shrinkSpeed by remember { mutableStateOf("Normal") }
     var hintFrequency by remember { mutableIntStateOf(30) }
-    var safeZoneRadius by remember { mutableFloatStateOf(350f) }
+    var safeZoneRadius by remember { mutableFloatStateOf(1000f) } // Minimum 1km (1000m)
     var safeZoneStages by remember { mutableIntStateOf(5) }
     var showAdjustSafeZoneDialog by remember { mutableStateOf(false) }
 
@@ -451,28 +451,52 @@ fun CreateRoomScreen(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Virtual Arena Disclaimer Notice
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0x33FFB300))
-                    .border(1.dp, Color(0x66FFB300), RoundedCornerShape(12.dp))
-                    .padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically
+            // Real Life GPS Outdoor Match Information & Host Role
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = Color(0xFF0F1528),
+                border = BorderStroke(1.dp, ElectricBlue.copy(alpha = 0.6f)),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Icon(
-                    imageVector = Icons.Default.Info,
-                    contentDescription = null,
-                    tint = Color(0xFFFFB300),
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Virtual arena only — no GPS or real-world location sharing.",
-                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 11.sp),
-                    color = Color(0xFFFFE082)
-                )
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(Color(0x2200E5FF)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.GpsFixed,
+                                contentDescription = null,
+                                tint = ElectricBlue,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "REAL-WORLD OUTDOOR GPS MATCH",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Black),
+                                color = Color.White
+                            )
+                            Text(
+                                text = "High-Res Satellite View • Min 1.0 km Safe Zone",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                                color = NeonGreen
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "• HOST PERMISSION: You are the game host. Only you can share the room code & QR with partner squad members.\n• STEALTH PROTOCOL: Seekers & Hiders are 100% invisible on the map. Hunt by real-world physical sight, sound, and safe zone proximity.",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 16.sp),
+                        color = Color(0xFFBAC5DC)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(20.dp))

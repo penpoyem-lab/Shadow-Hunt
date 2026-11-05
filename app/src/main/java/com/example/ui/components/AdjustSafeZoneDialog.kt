@@ -145,9 +145,9 @@ fun AdjustSafeZoneDialog(
                             style = Stroke(1f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f)))
                         )
 
-                        // Scaled safe zone circle (maps 100m..1000m to 25%..100% of maxR)
-                        val norm = (radius - 100f) / 900f
-                        val circleR = (maxR * 0.25f + maxR * 0.75f * norm).coerceIn(15f, maxR)
+                        // Scaled safe zone circle (maps 1000m..3000m to 35%..100% of maxR)
+                        val norm = ((radius - 1000f) / 2000f).coerceIn(0f, 1f)
+                        val circleR = (maxR * 0.35f + maxR * 0.65f * norm).coerceIn(25f, maxR)
 
                         // Shockwave ring
                         drawCircle(
@@ -182,7 +182,7 @@ fun AdjustSafeZoneDialog(
                         drawCircle(Color(0xFF00E676), radius = 4.dp.toPx(), center = Offset(cx - r1 * 0.5f, cy + r1 * 0.6f))
                     }
 
-                    // Floating Radius Pill
+                    // Floating Radius Pill (Min 1.0 km)
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = Color(0xDD0C101D),
@@ -192,7 +192,7 @@ fun AdjustSafeZoneDialog(
                             .padding(bottom = 8.dp)
                     ) {
                         Text(
-                            text = "${radius.toInt()} METERS",
+                            text = "%.1f km (${radius.toInt()}m)".format(radius / 1000f),
                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black),
                             color = ElectricBlue,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
@@ -202,9 +202,9 @@ fun AdjustSafeZoneDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // RADIUS PRESET CHIPS
+                // RADIUS PRESET CHIPS (MINIMUM 1KM)
                 Text(
-                    text = "INITIAL SAFE ZONE RADIUS",
+                    text = "INITIAL SAFE ZONE RADIUS (MINIMUM 1 KM)",
                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                     color = TextSecondary,
                     modifier = Modifier.fillMaxWidth()
@@ -216,7 +216,7 @@ fun AdjustSafeZoneDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    listOf(150f, 250f, 350f, 500f, 800f).forEach { rVal ->
+                    listOf(1000f, 1500f, 2000f, 2500f, 3000f).forEach { rVal ->
                         val isSel = (radius == rVal)
                         Surface(
                             onClick = { radius = rVal },
@@ -226,7 +226,7 @@ fun AdjustSafeZoneDialog(
                             modifier = Modifier.weight(1f)
                         ) {
                             Text(
-                                text = "${rVal.toInt()}m",
+                                text = "%.1fkm".format(rVal / 1000f),
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                 color = if (isSel) Color.Black else Color.White,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -238,11 +238,11 @@ fun AdjustSafeZoneDialog(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Custom Slider
+                // Custom Slider (1000m to 3000m)
                 Slider(
-                    value = radius,
-                    onValueChange = { radius = (it / 25).toInt() * 25f },
-                    valueRange = 100f..1000f,
+                    value = radius.coerceAtLeast(1000f),
+                    onValueChange = { radius = (it / 50).toInt() * 50f },
+                    valueRange = 1000f..3000f,
                     colors = SliderDefaults.colors(
                         thumbColor = ElectricBlue,
                         activeTrackColor = ElectricBlue,

@@ -62,6 +62,7 @@ class RealOutdoorGameEngine(
     private var engineScope: CoroutineScope? = null
     private var isRunning = false
     private var hasAnchoredToRealGps = false
+    private var lastProximityAlertMillis: Long = 0L
 
     fun initializeRoom(
         settings: LiveRoomSettings,
@@ -234,7 +235,7 @@ class RealOutdoorGameEngine(
 
             val local = _players.value.find { it.isLocalPlayer }
             val roleName = if (local?.role == PlayerRole.SEEKER) "SEEKER (HUNTER)" else "HIDER (RUNNER)"
-            postAlert("YOUR ROLE: $roleName! 1:30 Radar Reveal incoming!")
+            postAlert("YOUR ROLE: $roleName! Stay inside the Safe Zone!")
 
             launchLoops()
         }
@@ -249,10 +250,8 @@ class RealOutdoorGameEngine(
             }
         }
 
-        // Match Timer & Safe Zone Ticker (every 1s) with 1:30 min Radar Reveal
+        // Match Timer & Safe Zone Ticker (every 1s)
         launch {
-            var blinkCounter = 90 // 1 minute 30 seconds
-            var activeRevealTime = 0
             while (isRunning && _gamePhase.value != GamePhase.GAME_OVER) {
                 delay(1000)
                 if (_remainingSeconds.value > 0) {
@@ -260,31 +259,6 @@ class RealOutdoorGameEngine(
                 } else {
                     onTimeExpired()
                     break
-                }
-
-                if (activeRevealTime > 0) {
-                    activeRevealTime--
-                    _radarRevealSecondsLeft.value = activeRevealTime
-                    if (activeRevealTime == 0) {
-                        _sonarActive.value = false
-                        _radarRevealActive.value = false
-                        postAlert("Stealth restored: Radar offline!")
-                    }
-                } else {
-                    blinkCounter--
-                    _radarCountdown.value = blinkCounter
-                    if (blinkCounter <= 0) {
-                        blinkCounter = 90 // Reset to 1:30 min
-                        _radarCountdown.value = blinkCounter
-                        activeRevealTime = 15 // 15-second mutual reveal window
-                        _radarRevealSecondsLeft.value = activeRevealTime
-                        _radarRevealActive.value = true
-                        _sonarActive.value = true
-                        soundEffects.playSonarPing()
-                        postAlert("📡 1:30 RADAR REVEAL! Seekers & Hiders exposed (15s)!")
-                    } else if (blinkCounter == 10) {
-                        postAlert("⚠️ Radar Ping in 10s: Seekers & Hiders will be exposed!")
-                    }
                 }
 
                 updateSafeZoneClock()
@@ -349,9 +323,10 @@ class RealOutdoorGameEngine(
             _safeZone.value.centerLatitude, _safeZone.value.centerLongitude
         )
 
-        // If not yet anchored to true real GPS location OR if safe zone is far (> 1200m) from player,
-        // automatically anchor the arena & runners right on the user's real location
-        if (!hasAnchoredToRealGps || zoneCenterDist > 1200f) {
+        // Anchor the safe circle zone ONCE on initial GPS fix.
+        // Afterward, the safe circle zone stays permanently locked to its fixed geographical position.
+        // The player moves in real life inside/outside this fixed zone.
+        if (!hasAnchoredToRealGps) {
             hasAnchoredToRealGps = true
             anchorGameToLocation(currentLoc.latitude, currentLoc.longitude)
             return
@@ -364,7 +339,7 @@ class RealOutdoorGameEngine(
         local.longitude = currentLoc.longitude
         local.accuracyMeters = currentLoc.accuracy
 
-        // If local player is seeker, find nearest runner within 20m
+        // Proximity detection for accurate same location (Haptics + Siren alert)
         if (local.role == PlayerRole.SEEKER) {
             val runners = currentList.filter { it.role == PlayerRole.RUNNER && !it.isTagged }
             var closest: RealGpsPlayer? = null
@@ -383,6 +358,41 @@ class RealOutdoorGameEngine(
 
             _nearbyTarget.value = if (minDist <= 20f) closest else null
             _nearbyDistance.value = minDist
+
+            // When Seeker finds Hider at accurate same location (<= 8m)
+            if (minDist <= 8f && closest != null) {
+                val now = System.currentTimeMillis()
+                if (now - lastProximityAlertMillis > 3500L) {
+                    lastProximityAlertMillis = now
+                    soundEffects.playTargetLockedHaptic()
+                    postAlert("🚨 TARGET FOUND! ${closest.nickname} is at your exact location (${minDist.toInt()}m)!")
+                }
+            }
+        } else {
+            // Local player is RUNNER (Hider) - detect if Seeker is at accurate same location
+            val seekers = currentList.filter { it.role == PlayerRole.SEEKER }
+            var minSeekerDist = 9999f
+            var nearestSeeker: RealGpsPlayer? = null
+
+            seekers.forEach { seeker ->
+                val dist = LiveLocationManager.distanceMeters(
+                    local.latitude, local.longitude,
+                    seeker.latitude, seeker.longitude
+                )
+                if (dist < minSeekerDist) {
+                    minSeekerDist = dist
+                    nearestSeeker = seeker
+                }
+            }
+
+            if (minSeekerDist <= 8f && nearestSeeker != null) {
+                val now = System.currentTimeMillis()
+                if (now - lastProximityAlertMillis > 3500L) {
+                    lastProximityAlertMillis = now
+                    soundEffects.playTargetLockedHaptic()
+                    postAlert("⚠️ YOU ARE FOUND! Hunter ${nearestSeeker.nickname} is at your exact spot (${minSeekerDist.toInt()}m)!")
+                }
+            }
         }
 
         // Safe zone check for local player

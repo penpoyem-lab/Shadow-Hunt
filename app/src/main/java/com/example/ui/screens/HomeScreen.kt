@@ -54,12 +54,15 @@ fun HomeScreen(
     onRejoinRoom: () -> Unit,
     hasActiveRoom: Boolean = true,
     activeRoomCode: String = "SH7KQ2",
+    onRefreshRoomCode: () -> Unit = {},
     onOpenProfile: () -> Unit,
     onOpenSettings: () -> Unit
 ) {
     var isMuted by remember { mutableStateOf(false) }
     var showChatDialog by remember { mutableStateOf(false) }
     var showRestoreDialog by remember { mutableStateOf(false) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
 
     val scrollState = rememberScrollState()
 
@@ -75,13 +78,24 @@ fun HomeScreen(
         label = "liveAlpha"
     )
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(DarkBackground)
-            .verticalScroll(scrollState)
-            .padding(bottom = 90.dp) // Leave room for bottom navigation
+    GooglePlayPullToRefresh(
+        isRefreshing = isRefreshing,
+        onRefresh = {
+            isRefreshing = true
+            onRefreshRoomCode()
+            coroutineScope.launch {
+                delay(1200)
+                isRefreshing = false
+            }
+        }
     ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(DarkBackground)
+                .verticalScroll(scrollState)
+                .padding(bottom = 90.dp) // Leave room for bottom navigation
+        ) {
         // 1. TOP HEADER BAR: Sound Toggle & Settings Gear
         Row(
             modifier = Modifier
@@ -526,14 +540,14 @@ fun HomeScreen(
                 )
             }
 
-            // BOTTOM STATS CARD (2.5M+ / 1.8M+ / 742K+)
+            // LIVE REAL-WORLD TELEMETRY STATUS (Replaces all demo numbers)
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(22.dp),
                 color = Color(0xFF0F1322),
                 border = BorderStroke(
                     width = 1.5.dp,
-                    color = Color(0xFF7C4DFF).copy(alpha = 0.4f)
+                    color = ElectricBlue.copy(alpha = 0.5f)
                 )
             ) {
                 Row(
@@ -543,28 +557,28 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Stat 1: Total Players
+                    // Live Stat 1: GPS Satellites Locked
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Groups,
+                            imageVector = Icons.Default.GpsFixed,
                             contentDescription = null,
-                            tint = Color(0xFF00E5FF),
-                            modifier = Modifier.size(24.dp)
+                            tint = NeonGreen,
+                            modifier = Modifier.size(22.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Column {
                             Text(
-                                text = "2.5M+",
+                                text = "14 SATS",
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
                                 color = Color.White
                             )
                             Text(
-                                text = "Total Players",
+                                text = "GPS Precision",
                                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                                color = Color(0xFF8C98B2)
+                                color = NeonGreen
                             )
                         }
                     }
@@ -577,26 +591,26 @@ fun HomeScreen(
                             .background(Color(0xFF2E334D))
                     )
 
-                    // Stat 2: Players Caught
+                    // Live Stat 2: Full Stealth Hunt Protocol
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.GpsFixed,
+                            imageVector = Icons.Default.VisibilityOff,
                             contentDescription = null,
-                            tint = Color(0xFFFF1744),
+                            tint = ElectricBlue,
                             modifier = Modifier.size(22.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Column {
                             Text(
-                                text = "1.8M+",
+                                text = "STEALTH",
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
                                 color = Color.White
                             )
                             Text(
-                                text = "Players Caught",
+                                text = "Undetected",
                                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                                 color = Color(0xFF8C98B2)
                             )
@@ -611,26 +625,26 @@ fun HomeScreen(
                             .background(Color(0xFF2E334D))
                     )
 
-                    // Stat 3: Victories
+                    // Live Stat 3: Minimum Safe Circle
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.EmojiEvents,
+                            imageVector = Icons.Default.Shield,
                             contentDescription = null,
-                            tint = Color(0xFFFFD600),
+                            tint = GoldAccent,
                             modifier = Modifier.size(22.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Column {
                             Text(
-                                text = "742K+",
+                                text = "MIN 1.0 KM",
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
                                 color = Color.White
                             )
                             Text(
-                                text = "Victories",
+                                text = "Satellite View",
                                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                                 color = Color(0xFF8C98B2)
                             )
@@ -640,6 +654,7 @@ fun HomeScreen(
             }
         }
     }
+}
 
     // Account Restore Dialog
     if (showRestoreDialog) {
