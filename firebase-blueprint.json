@@ -1,0 +1,65 @@
+{
+  "entities": {
+    "Room": {
+      "title": "Room",
+      "description": "Multiplayer tactical GPS game room document",
+      "type": "object",
+      "properties": {
+        "roomCode": { "type": "string", "description": "Unique 6-character room code" },
+        "hostId": { "type": "string", "description": "User ID of the game room host" },
+        "status": { "type": "string", "description": "Room status: LOBBY, ACTIVE, FINISHED" },
+        "safeZoneLat": { "type": "number", "description": "Fixed safe circle center latitude" },
+        "safeZoneLon": { "type": "number", "description": "Fixed safe circle center longitude" },
+        "safeZoneRadius": { "type": "number", "description": "Safe zone radius in meters (min 1000)" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Room creation timestamp" },
+        "lastActive": { "type": "string", "format": "date-time", "description": "Last activity timestamp" }
+      },
+      "required": ["roomCode", "hostId", "status", "safeZoneLat", "safeZoneLon", "safeZoneRadius"]
+    },
+    "Player": {
+      "title": "Player",
+      "description": "Real human squad member participant in a game room",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Unique user authentication ID" },
+        "nickname": { "type": "string", "description": "Player codename" },
+        "avatarId": { "type": "string", "description": "Selected avatar identifier" },
+        "role": { "type": "string", "description": "Game role: SEEKER or RUNNER" },
+        "isHost": { "type": "boolean", "description": "True if host with launch permissions" },
+        "isReady": { "type": "boolean", "description": "Ready status in lobby" },
+        "latitude": { "type": "number", "description": "Live GPS latitude" },
+        "longitude": { "type": "number", "description": "Live GPS longitude" },
+        "accuracy": { "type": "number", "description": "GPS accuracy in meters" },
+        "bearing": { "type": "number", "description": "Compass heading in degrees" },
+        "lastUpdated": { "type": "string", "format": "date-time", "description": "Last location update timestamp" }
+      },
+      "required": ["userId", "nickname", "avatarId", "role", "isHost", "isReady"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User account profile record",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID" },
+        "nickname": { "type": "string", "description": "Display nickname" },
+        "avatarId": { "type": "string", "description": "Selected avatar icon" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+      },
+      "required": ["userId", "nickname", "avatarId"]
+    }
+  },
+  "firestore": {
+    "/rooms/{roomCode}": {
+      "schema": "#/entities/Room",
+      "description": "Live game room document"
+    },
+    "/rooms/{roomCode}/players/{userId}": {
+      "schema": "#/entities/Player",
+      "description": "Real human participants inside the room"
+    },
+    "/users/{userId}": {
+      "schema": "#/entities/UserProfile",
+      "description": "Authenticated user profile records"
+    }
+  }
+}

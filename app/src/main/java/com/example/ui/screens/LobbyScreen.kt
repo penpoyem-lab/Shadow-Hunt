@@ -495,12 +495,12 @@ fun LobbyScreen(
                         }
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "Empty Slot",
-                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 11.sp),
+                            text = "Real Friend Slot",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 10.sp),
                             color = TextMuted
                         )
                         Text(
-                            text = "+ Invite / Join",
+                            text = "Scan QR to Join",
                             style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
                             color = ElectricBlue
                         )
@@ -541,12 +541,12 @@ fun LobbyScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
-                                text = "STANDARD ARENA",
+                                text = "REAL GPS SATELLITE ARENA",
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                 color = Color.White
                             )
                             Text(
-                                text = "${roomConfig.durationMinutes} min • Virtual arena (${roomConfig.seekersCount} Seeker)",
+                                text = "${roomConfig.durationMinutes} min • Live GPS Outdoor Hunt (Min 1.0 km Safe Zone)",
                                 style = MaterialTheme.typography.bodyMedium.copy(fontSize = 11.sp),
                                 color = TextSecondary
                             )

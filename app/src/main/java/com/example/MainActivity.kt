@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.example.audio.GameSoundEffects
+import com.example.data.FirestoreGameRepository
 import com.example.game.RealOutdoorGameEngine
 import com.example.game.ShadowHuntEngine
 import com.example.location.LiveLocationManager
@@ -131,6 +132,10 @@ fun ShadowHuntApp(
         )
     }
 
+    val firestoreRepo = remember { FirestoreGameRepository(context.applicationContext) }
+    var cloudGpsSquad by remember { mutableStateOf<List<RealGpsPlayer>>(emptyList()) }
+    var isCurrentPlayerHost by remember { mutableStateOf(true) }
+
     var activeRoomConfig by remember { mutableStateOf(RoomConfig()) }
     var activeOutdoorSettings by remember { mutableStateOf(LiveRoomSettings(roomCode = "SH7KQ2")) }
     var hasActiveRoom by remember { mutableStateOf(true) }
@@ -151,18 +156,23 @@ fun ShadowHuntApp(
                 perms[Manifest.permission.ACCESS_COARSE_LOCATION] == true
         locationManager.updatePermission(locGranted)
 
-        // Launch real outdoor game with all members from the room!
-        val lobbySquad = engine.players.value
-        if (lobbySquad.isNotEmpty()) {
-            outdoorEngine.initializeRoomFromLobby(activeOutdoorSettings, lobbySquad)
+        // Launch real outdoor game with all 100% real human members from cloud room!
+        val squad = if (cloudGpsSquad.isNotEmpty()) {
+            cloudGpsSquad
         } else {
-            outdoorEngine.initializeRoom(
-                activeOutdoorSettings,
-                userProfile.nickname,
-                userProfile.avatarId,
-                PlayerRole.SEEKER
+            listOf(
+                RealGpsPlayer(
+                    id = userProfile.playerId.ifEmpty { "player_local" },
+                    nickname = userProfile.nickname,
+                    avatarId = userProfile.avatarId,
+                    role = if (isCurrentPlayerHost) PlayerRole.SEEKER else PlayerRole.RUNNER,
+                    isHost = isCurrentPlayerHost,
+                    isLocalPlayer = true,
+                    isReady = true
+                )
             )
         }
+        outdoorEngine.initializeRoomWithRealSquad(activeOutdoorSettings, squad)
         outdoorEngine.startGame()
         currentScreen = Screen.OutdoorArena
     }
@@ -288,6 +298,7 @@ fun ShadowHuntApp(
                         userProfile = userProfile.copy(nickname = nickname, avatarId = avatarId)
                         activeRoomConfig = config
                         hasActiveRoom = true
+                        isCurrentPlayerHost = true
                         activeOutdoorSettings = LiveRoomSettings(
                             roomCode = config.code,
                             roomName = config.name,
@@ -295,7 +306,42 @@ fun ShadowHuntApp(
                             initialRadiusMeters = config.safeZoneRadiusMeters.coerceAtLeast(1000f),
                             shrinkSpeed = config.shrinkSpeed
                         )
-                        engine.initializeRoom(config, nickname, avatarId)
+
+                        val hostGpsPlayer = RealGpsPlayer(
+                            id = userProfile.playerId.ifEmpty { "host_" + System.currentTimeMillis() },
+                            nickname = nickname,
+                            avatarId = avatarId,
+                            role = PlayerRole.SEEKER,
+                            isHost = true,
+                            isLocalPlayer = true,
+                            isReady = true
+                        )
+                        cloudGpsSquad = listOf(hostGpsPlayer)
+
+                        val safeZone = RealGpsSafeZone(
+                            centerLatitude = locationManager.currentLocation.value?.latitude ?: 37.7749,
+                            centerLongitude = locationManager.currentLocation.value?.longitude ?: -122.4194,
+                            initialRadiusMeters = config.safeZoneRadiusMeters.coerceAtLeast(1000f),
+                            currentRadiusMeters = config.safeZoneRadiusMeters.coerceAtLeast(1000f)
+                        )
+
+                        firestoreRepo.createRoom(
+                            roomCode = config.code,
+                            hostId = hostGpsPlayer.id,
+                            hostPlayer = hostGpsPlayer,
+                            safeZone = safeZone,
+                            onSuccess = {
+                                Toast.makeText(context, "Room ${config.code} live on cloud! Waiting for squad to join.", Toast.LENGTH_SHORT).show()
+                            },
+                            onError = { err ->
+                                Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
+                            }
+                        )
+
+                        firestoreRepo.listenToRoomPlayers(config.code, hostGpsPlayer.id) { squad ->
+                            cloudGpsSquad = squad
+                        }
+
                         currentScreen = Screen.Lobby
                     }
                 )
@@ -308,54 +354,147 @@ fun ShadowHuntApp(
                     onJoinGame = { code, nickname, avatarId ->
                         soundEffects.playClick()
                         userProfile = userProfile.copy(nickname = nickname, avatarId = avatarId)
-                        val joinedConfig = RoomConfig(code = code, name = "Private Room $code")
+                        val joinedConfig = RoomConfig(code = code, name = "Live Room $code")
                         activeRoomConfig = joinedConfig
                         hasActiveRoom = true
+                        isCurrentPlayerHost = false
                         activeOutdoorSettings = LiveRoomSettings(
                             roomCode = code,
                             roomName = "Live Room $code"
                         )
-                        engine.joinExistingRoom(joinedConfig, nickname, avatarId)
+
+                        val joinGpsPlayer = RealGpsPlayer(
+                            id = userProfile.playerId.ifEmpty { "p_" + System.currentTimeMillis() },
+                            nickname = nickname,
+                            avatarId = avatarId,
+                            role = PlayerRole.RUNNER,
+                            isHost = false,
+                            isLocalPlayer = true,
+                            isReady = true
+                        )
+                        cloudGpsSquad = listOf(joinGpsPlayer)
+
+                        firestoreRepo.joinRoom(
+                            roomCode = code,
+                            player = joinGpsPlayer,
+                            onSuccess = {
+                                Toast.makeText(context, "Connected to room $code! Waiting in lobby.", Toast.LENGTH_SHORT).show()
+                            },
+                            onError = { err ->
+                                Toast.makeText(context, err, Toast.LENGTH_LONG).show()
+                            }
+                        )
+
+                        firestoreRepo.listenToRoomPlayers(code, joinGpsPlayer.id) { squad ->
+                            cloudGpsSquad = squad
+                        }
+
+                        firestoreRepo.listenToRoomStatus(code) { status ->
+                            if (status == "ACTIVE" && currentScreen != Screen.OutdoorArena) {
+                                // Match started by Host! Automatically transition to Real Outdoor Arena!
+                                permissionLauncher.launch(
+                                    arrayOf(
+                                        Manifest.permission.ACCESS_FINE_LOCATION,
+                                        Manifest.permission.ACCESS_COARSE_LOCATION,
+                                        Manifest.permission.CAMERA
+                                    )
+                                )
+                            }
+                        }
+
                         currentScreen = Screen.Lobby
                     }
                 )
             }
             Screen.Lobby -> {
+                val displaySquad = if (cloudGpsSquad.isNotEmpty()) {
+                    cloudGpsSquad.map { gp ->
+                        PlayerState(
+                            id = gp.id,
+                            nickname = gp.nickname,
+                            avatarId = gp.avatarId,
+                            role = gp.role,
+                            isHost = gp.isHost,
+                            isReady = gp.isReady,
+                            isBot = false,
+                            isTagged = gp.isTagged,
+                            isLocalPlayer = gp.isLocalPlayer
+                        )
+                    }
+                } else {
+                    listOf(
+                        PlayerState(
+                            id = userProfile.playerId,
+                            nickname = userProfile.nickname,
+                            avatarId = userProfile.avatarId,
+                            role = if (isCurrentPlayerHost) PlayerRole.SEEKER else PlayerRole.RUNNER,
+                            isHost = isCurrentPlayerHost,
+                            isReady = true,
+                            isBot = false,
+                            isLocalPlayer = true
+                        )
+                    )
+                }
+
                 LobbyScreen(
                     roomConfig = activeRoomConfig,
-                    players = players,
+                    players = displaySquad,
                     onLeaveLobby = {
                         currentScreen = Screen.Home
                     },
                     onStartGame = {
-                        if (players.size >= 3) {
-                            permissionLauncher.launch(
-                                arrayOf(
-                                    Manifest.permission.ACCESS_FINE_LOCATION,
-                                    Manifest.permission.ACCESS_COARSE_LOCATION,
-                                    Manifest.permission.CAMERA
-                                )
+                        if (cloudGpsSquad.size >= 3) {
+                            soundEffects.playClick()
+                            firestoreRepo.launchMatch(
+                                roomCode = activeRoomConfig.code,
+                                assignedPlayers = cloudGpsSquad,
+                                onSuccess = {
+                                    permissionLauncher.launch(
+                                        arrayOf(
+                                            Manifest.permission.ACCESS_FINE_LOCATION,
+                                            Manifest.permission.ACCESS_COARSE_LOCATION,
+                                            Manifest.permission.CAMERA
+                                        )
+                                    )
+                                },
+                                onError = { _ ->
+                                    permissionLauncher.launch(
+                                        arrayOf(
+                                            Manifest.permission.ACCESS_FINE_LOCATION,
+                                            Manifest.permission.ACCESS_COARSE_LOCATION,
+                                            Manifest.permission.CAMERA
+                                        )
+                                    )
+                                }
                             )
                         } else {
-                            Toast.makeText(context, "Minimum 3 players required! Invite squad members via Room Code or QR scanner.", Toast.LENGTH_LONG).show()
+                            Toast.makeText(
+                                context,
+                                "Minimum 3 real players required! Currently connected: ${cloudGpsSquad.size}/3. Share Room Code ${activeRoomConfig.code} or QR scanner.",
+                                Toast.LENGTH_LONG
+                            ).show()
                         }
                     },
                     onToggleReady = {
                         soundEffects.playClick()
                     },
                     onAddBot = {
-                        soundEffects.playClick()
-                        engine.addSquadMember()
+                        Toast.makeText(
+                            context,
+                            "Pure real human players only (0 bots). Share Room Code ${activeRoomConfig.code} or scan QR code to invite friends!",
+                            Toast.LENGTH_LONG
+                        ).show()
                     }
                 )
             }
             Screen.Arena -> {
-                GameArenaScreen(
-                    engine = engine,
-                    onPauseOrExit = {
-                        engine.stopGame()
-                        currentScreen = Screen.Lobby
-                    }
+                // Completely eliminate virtual arena in favor of pure Real GPS Outdoor Satellite Arena
+                permissionLauncher.launch(
+                    arrayOf(
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.ACCESS_COARSE_LOCATION,
+                        Manifest.permission.CAMERA
+                    )
                 )
             }
             Screen.OutdoorArena -> {

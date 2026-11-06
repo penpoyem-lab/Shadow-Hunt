@@ -82,20 +82,13 @@ class RealOutdoorGameEngine(
 
         val list = mutableListOf<RealGpsPlayer>()
 
-        val totalPlayers = 6
-        // Smart random role assignment: 1-2 seekers, remaining are hiders
-        val seekerCount = if (totalPlayers <= 4) 1 else 2
-        val randomSeekers = (0 until totalPlayers).shuffled(Random(System.currentTimeMillis())).take(seekerCount).toSet()
-
-        val myRole = if (randomSeekers.contains(0)) PlayerRole.SEEKER else PlayerRole.RUNNER
-
-        // Local Player
+        // Local Player only - Pure real human players, NO BOTS
         list.add(
             RealGpsPlayer(
                 id = "p_local",
                 nickname = localNickname.ifEmpty { "Kishalay_007" },
                 avatarId = localAvatarId,
-                role = myRole,
+                role = preferredRole,
                 latitude = lat,
                 longitude = lon,
                 accuracyMeters = currentLoc?.accuracy ?: 5f,
@@ -104,36 +97,6 @@ class RealOutdoorGameEngine(
                 isLocalPlayer = true
             )
         )
-
-        // Outdoor runners/hunters placed around the park (within 150m of center)
-        val names = listOf("RexHunter", "ShadowKing", "Devil", "Valkyrie", "Ghost", "Cipher")
-        val avatars = listOf("hunter", "cyber", "phantom", "reaper", "demon")
-
-        for (i in 1 until totalPlayers) {
-            val role = if (randomSeekers.contains(i)) PlayerRole.SEEKER else PlayerRole.RUNNER
-
-            // Scatter within 80m - 200m radius of current GPS coordinates
-            val angle = (i * 2.0 * Math.PI / (totalPlayers - 1))
-            val distMeters = 80.0 + Random.nextDouble(20.0, 140.0)
-
-            val dLat = (distMeters * Math.cos(angle)) / 111320.0
-            val dLon = (distMeters * Math.sin(angle)) / (111320.0 * Math.cos(Math.toRadians(lat)))
-
-            list.add(
-                RealGpsPlayer(
-                    id = "bot_$i",
-                    nickname = names[(i - 1) % names.size],
-                    avatarId = avatars[(i - 1) % avatars.size],
-                    role = role,
-                    latitude = lat + dLat,
-                    longitude = lon + dLon,
-                    accuracyMeters = 8f,
-                    isHost = false,
-                    isReady = true,
-                    isLocalPlayer = false
-                )
-            )
-        }
 
         _players.value = list
         _safeZone.value = RealGpsSafeZone(
@@ -217,6 +180,53 @@ class RealOutdoorGameEngine(
         _lastCapturedMugshot.value = null
     }
 
+    /**
+     * Initializes room with 100% real human players synced via Firestore cloud.
+     * Preserves real GPS satellite coordinates from each connected phone.
+     */
+    fun initializeRoomWithRealSquad(
+        settings: LiveRoomSettings,
+        squad: List<RealGpsPlayer>
+    ) {
+        roomSettings = settings
+        val currentLoc = locationManager.currentLocation.value
+        val hasLoc = currentLoc != null && currentLoc.latitude != 0.0 && currentLoc.longitude != 0.0
+        hasAnchoredToRealGps = hasLoc
+        val lat = if (hasLoc) currentLoc!!.latitude else settings.centerLatitude
+        val lon = if (hasLoc) currentLoc!!.longitude else settings.centerLongitude
+
+        settings.centerLatitude = lat
+        settings.centerLongitude = lon
+
+        val updatedSquad = squad.map { p ->
+            if (p.isLocalPlayer && hasLoc) {
+                p.copy(
+                    latitude = lat,
+                    longitude = lon,
+                    accuracyMeters = currentLoc?.accuracy ?: 5f
+                )
+            } else {
+                p
+            }
+        }
+
+        _players.value = updatedSquad
+        _safeZone.value = RealGpsSafeZone(
+            centerLatitude = lat,
+            centerLongitude = lon,
+            initialRadiusMeters = settings.initialRadiusMeters,
+            currentRadiusMeters = settings.initialRadiusMeters,
+            targetRadiusMeters = settings.initialRadiusMeters,
+            stage = 1,
+            totalStages = 5,
+            countdownSeconds = 45,
+            isShrinking = false
+        )
+        _remainingSeconds.value = settings.durationMinutes * 60
+        _gamePhase.value = GamePhase.PREPARATION
+        _lastCapturedMugshot.value = null
+    }
+
     fun startGame() {
         engineScope?.cancel()
         engineScope = CoroutineScope(Dispatchers.Default + Job())
@@ -236,6 +246,25 @@ class RealOutdoorGameEngine(
             val local = _players.value.find { it.isLocalPlayer }
             val roleName = if (local?.role == PlayerRole.SEEKER) "SEEKER (HUNTER)" else "HIDER (RUNNER)"
             postAlert("YOUR ROLE: $roleName! Stay inside the Safe Zone!")
+
+            // Listen to remote real human squad members from cloud
+            firestoreRepo.listenToRoomPlayers(
+                roomCode = roomSettings.roomCode,
+                currentUserId = local?.id ?: "p_local"
+            ) { remotePlayers ->
+                val current = _players.value.toMutableList()
+                remotePlayers.forEach { remote ->
+                    if (!remote.isLocalPlayer) {
+                        val idx = current.indexOfFirst { it.id == remote.id }
+                        if (idx != -1) {
+                            current[idx] = remote.copy(isLocalPlayer = false)
+                        } else {
+                            current.add(remote.copy(isLocalPlayer = false))
+                        }
+                    }
+                }
+                _players.value = current
+            }
 
             launchLoops()
         }
@@ -339,6 +368,17 @@ class RealOutdoorGameEngine(
         local.longitude = currentLoc.longitude
         local.accuracyMeters = currentLoc.accuracy
 
+        // Stream local GPS to Firestore cloud so other phones see real location
+        firestoreRepo.syncPlayerLocation(
+            roomCode = roomSettings.roomCode,
+            playerId = local.id,
+            latitude = local.latitude,
+            longitude = local.longitude,
+            accuracy = local.accuracyMeters,
+            role = local.role.name,
+            isTagged = local.isTagged
+        )
+
         // Proximity detection for accurate same location (Haptics + Siren alert)
         if (local.role == PlayerRole.SEEKER) {
             val runners = currentList.filter { it.role == PlayerRole.RUNNER && !it.isTagged }
@@ -412,7 +452,7 @@ class RealOutdoorGameEngine(
 
         // Live backend sync with Firestore
         firestoreRepo.syncPlayerLocation(
-            roomId = roomSettings.roomCode,
+            roomCode = roomSettings.roomCode,
             playerId = local.id,
             latitude = local.latitude,
             longitude = local.longitude,

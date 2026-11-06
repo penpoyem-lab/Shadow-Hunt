@@ -1,82 +1,143 @@
-# Live High-Precision GPS Satellite Tracking & Locked Safe Zone
+# Real GPS Outdoor Hunt: Cloud Multi-Player & Pure Human Protocol
 
-Implement high-precision live location mapping with high-detail street level satellite imagery, a geographically locked safe circle zone, and dynamic glowing accuracy ring visualization.
+Architectural plan to convert the game into a 100% genuine outdoor real-time multiplayer GPS hunt: eliminating all bot players, removing virtual arena fallbacks, establishing real-time cloud room synchronization across separate phones, and strictly requiring 3 real human players to launch.
 
 ## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> The following product behaviors have been established based on your design choices:
-> - **Geographically Locked Safe Zone**: The Safe Circle Zone center is permanently fixed at the initial host coordinates (or chosen landmark anchor). The safe perimeter remains fixed on earth while the player moves in real-time within or outside the zone.
-> - **High-Detail Street Level Satellite Zoom**: Camera zoom defaults to high-detail street level (~zoom 17.5) rendering sharp satellite building footprints, streets, alleys, and paths.
-> - **Live GPS Precision Visualization**: Player dot is surrounded by a translucent glowing neon cyan accuracy ring whose radius scales dynamically with device GPS horizontal accuracy (±X meters).
-> - **Strict 1:30 Stealth Protocol Preserved**: Seekers and Hiders remain completely invisible to each other outside the periodic 1:30 minute (90-second) 15s mutual radar reveal window.
+> The following product decisions were confirmed during interactive planning:
+
+- **Confirmed Decision 1 (Pure Real GPS Outdoor Arena)**: Completely remove all virtual 2D arena concepts, bot logic, and virtual disclaimer text. The app runs exclusively on hardware GPS telemetry and high-detail satellite maps in the real world.
+- **Confirmed Decision 2 (Strictly Zero Bots)**: Bot players are completely eliminated. The lobby starts with only the Host (`1/3`), and will not allow match start until at least 2 other real humans join using the Room Code or QR scanner (`3/3`).
+- **Confirmed Decision 3 (Real-Time Cloud Synchronization)**: Rooms, lobby memberships, and live player GPS coordinates will synchronize in real time via Firebase Firestore so friends on separate devices can join instantly and track each other on the satellite map.
 
 ---
 
-### 1. Overview & Core Concept
+## 1. Overview & Core Concept
 
-- **What It Delivers**: Transforms the outdoor gameplay into a high-precision live GPS tactical mission on real satellite imagery.
-- **Geographical Integrity**: Rather than shifting the safe zone with the user, the safe zone circle is anchored permanently at fixed GPS coordinates. As the user walks, runs, or maneuvers in the physical world, their live GPS marker moves across the real satellite map toward or away from the fixed safe zone boundary.
-- **Visual Precision**: Renders real-time GPS accuracy tolerance as a pulsing halo (e.g. ±3m to ±12m) and displays live telemetry (Lat/Lon, Bearing, Altitude, Speed in km/h, Satellites locked).
+### What It Does
+An outdoor tactical game played by real friends on their own mobile devices. The game Host creates a room with a 6-character room code and QR code. Friends open their app, scan the host's QR code or type the code, and join the lobby. The game strictly enforces a 3-human minimum before the host can start the match. Once started, players hunt each other inside a geographically locked 1.0 km safe circle zone using real hardware GPS, high-detail satellite imagery, and tactile proximity alerts.
 
----
-
-### 2. User Experience & Visual Design
-
-#### Visual Layout & Telemetry HUD
-- **Satellite Map Viewport**: Full-bleed ESRI World Imagery high-resolution satellite tiles showing actual streets, buildings, foliage, and paths.
-- **Fixed Safe Zone Ring**: A 1.0+ km perimeter line rendered with a vibrant cyan-gold glow, dashed urgency indicator, and expanding perimeter shockwave.
-- **Player Marker**:
-  - Bright golden core pin with directional heading beam pointing along device azimuth.
-  - Surrounding translucent cyan glowing ring whose physical diameter on screen reflects exact GPS accuracy in meters.
-  - Real-time coordinates and speed badge docked smoothly on the bottom left.
-- **Distance & Boundary Metrics**: Real-time distance indicator showing exact meters to safe zone edge, updating smoothly at 60 FPS without jitter.
+### Target Audience & Real-World Context
+Groups of 3 or more friends playing outdoors in parks, campuses, neighborhoods, or sports fields without simulated bot fillers.
 
 ---
 
-### 3. Key Technical Decisions & Trade-Offs
+## 2. User Experience & Visual Design
 
-- **Decision 1: Fixed Geographical Anchor vs Auto-Anchor**
-  - *Chosen Approach*: Anchor the Safe Zone center once on match launch to the host's actual location. The safe zone center coordinates never move with the player; only the player marker moves.
-  - *Why*: True hide-and-seek gameplay requires an objective play zone in the real world (park, neighborhood, campus) where players can be pushed toward the center or caught outside the perimeter.
-- **Decision 2: Accuracy Ring Scaling Math**
-  - *Chosen Approach*: Convert `currentLoc.accuracy` (in meters) into map pixels using Mercator meter-to-pixel projection at the current zoom level.
-  - *Why*: Ensures the glowing halo visually represents the actual GPS margin of error on the ground.
-- **Decision 3: Tile Caching & Street-Level Resolution**
-  - *Chosen Approach*: High-detail zoom level (17.0–18.0) with LRU in-memory tile caching for instant street and building rendering.
-
----
-
-### 4. Technical Architecture & Data Strategy
+### Key User Flows
 
 ```
-┌────────────────────────────────────────────────────────┐
-│                   Live Location Manager                │
-│    (FusedLocationProviderClient / GPS Satellites)      │
-└───────────────────────────┬────────────────────────────┘
-                            │ (lat, lon, accuracy, bearing, speed)
-                            ▼
-┌────────────────────────────────────────────────────────┐
-│                RealOutdoorGameEngine                   │
-│  - Locked Safe Zone: centerLat, centerLon, radius (1km)│
-│  - Distance calculation: distToEdge = distCenter - R   │
-│  - Proximity tag detection & 1:30 reveal ticker       │
-└───────────────────────────┬────────────────────────────┘
-                            │ StateFlow updates
-                            ▼
-┌────────────────────────────────────────────────────────┐
-│                   DarkTacticalMap                      │
-│  - High-res Satellite Tiles (Zoom 17.5)                │
-│  - Fixed Safe Zone Ring (Always Showable)              │
-│  - Live Player Pin + Directional Azimuth Beam          │
-│  - Dynamic Glowing GPS Accuracy Ring (±Accuracy m)     │
-│  - Opponents visible ONLY during 1:30 reveal           │
-└────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 1. HOST CREATES ROOM                                                        │
+│ Host sets Safe Zone (min 1.0 km) -> Generates Room Code (e.g. SH7921) & QR  │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 2. LOBBY (STRICT 3-HUMAN GATE)                                              │
+│ • State 1/3: "WAITING FOR PLAYERS (1/3 Joined - Need 2 real players)" [RED] │
+│ • START GAME Button: LOCKED with Lock icon                                  │
+│ • Host shares Room Code or presents full-screen QR code                     │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 3. SQUAD MEMBERS JOIN ACROSS PHONES                                         │
+│ • Friend 2 scans QR code -> Joins lobby -> Lobby auto-updates to 2/3        │
+│ • Friend 3 scans QR code -> Joins lobby -> Lobby auto-updates to 3/3 [GREEN]│
+│ • START GAME Button UNLOCKS: "START MATCH (3 PLAYERS)"                      │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 4. REAL OUTDOOR SATELLITE ARENA                                             │
+│ • Host launches game -> All phones transition to Satellite Map              │
+│ • 1 Seeker and 2 Hiders randomly and smartly assigned                       │
+│ • Safe Zone locked permanently to geographic start center (min 1.0 km)       │
+│ • Live GPS precision halo (±Xm) & real-time multi-phone location streaming   │
+│ • Proximity alert siren & haptics when Seeker gets within <= 8m of a Hider  │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-#### Verification Steps
-1. Verify Safe Zone center remains static at the initial coordinates while player position updates.
-2. Verify zoom level defaults to high-detail street level showing building footprints.
-3. Verify the glowing cyan accuracy circle scales with GPS accuracy tolerance.
-4. Verify Seeker/Hider mutual reveal triggers strictly every 1:30 minutes for 15 seconds.
-5. Compile and verify with `compile_applet`.
+### Visual Identity & Theme
+- **Theme**: Neon Tactical Cyber-Ops (M3 Dark Theme, `Color(0xFF060A14)` background, `ElectricBlue`, `NeonGreen`, `NeonRed`, `GoldAccent`).
+- **Lobby Roster**: Real human avatars with live connection status dots ("REAL PLAYER", "CONNECTED").
+- **Lockdown Indicator**: Status banner in the lobby clearly indicates exact player counts needed:
+  - `1/3`: Red border & background `Need 2 more real players`.
+  - `2/3`: Amber border & background `Need 1 more real player`.
+  - `3/3+`: Neon green border & background `Squad Ready • 3 Players Connected`.
+- **Top Bar in Arena**: Clean layout with `[Pause] [LIVE SATELLITE] [Match Timer] [Runners Count] [Minimap Toggle]` without overcrowding or unwanted buttons.
+
+---
+
+## 3. Key Product Decisions & Trade-Offs
+
+### 1. Total Removal of Bot Generation & Virtual Arena
+- **Decision**: Remove bot generation arrays (`botNames`, `botAvatars`) and the 2D simulated arena screen (`GameArenaScreen.kt`).
+- **Rationale**: The user explicitly requested: *"It's not ani vertual arena, real gps location is required.......Only real life human player are needed (no bot player ).."*
+- **Outcome**: The app is 100% focused on real GPS outdoor play.
+
+### 2. Cloud-Backed Real-Time Room Synchronization
+- **Decision**: Use Firebase Firestore for room state, lobby presence, and GPS position streaming.
+- **Rationale**: Real human players on different phones need a reliable, serverless way to discover rooms, join via room code/QR, and synchronize coordinates outdoors over cellular/5G data.
+- **Security & Structure**: Zero-trust rules where room creators are hosts, players can only update their own participant document, and room status governs match transitions.
+
+---
+
+## 4. Technical Architecture & Data Strategy
+
+### System Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            FIREBASE FIRESTORE                               │
+│                                                                             │
+│  Collection: rooms/{roomCode}                                               │
+│  ├── roomCode: "SH7921"                                                     │
+│  ├── hostId: "user_abc"                                                     │
+│  ├── status: "LOBBY" | "ACTIVE" | "FINISHED"                                │
+│  ├── safeZone: { lat: 37.7749, lon: -122.4194, radiusMeters: 1000 }         │
+│  └── Subcollection: players/{userId}                                        │
+│      ├── nickname: "Kishalay"                                               │
+│      ├── avatarId: "cyber"                                                  │
+│      ├── role: "SEEKER" | "RUNNER"                                          │
+│      ├── isHost: true                                                       │
+│      ├── lat: 37.7749, lon: -122.4194, accuracy: 4.5                       │
+│      └── lastUpdated: Timestamp                                             │
+└───────────────────────▲─────────────────────────────▲───────────────────────┘
+                        │ Real-Time Snapshot          │ Real-Time Snapshot
+                        │ Updates                     │ Updates
+        ┌───────────────┴───────────────┐     ┌───────┴───────────────────────┐
+        │        PHONE 1 (HOST)         │     │     PHONE 2 & 3 (PARTNERS)    │
+        │ • Creates Room SH7921         │     │ • Scan QR or Enter Code       │
+        │ • Displays QR / Code          │     │ • Join room in Firestore      │
+        │ • Listens to players subcoll  │     │ • Stream GPS coords to cloud  │
+        │ • Unlocks Start when >= 3     │     │ • Render real players on map  │
+        └───────────────────────────────┘     └───────────────────────────────┘
+```
+
+### Key Implementation Steps
+
+1. **Firebase Backend Provisioning**:
+   - Provision Firestore for real-time room and player coordination.
+   - Configure security rules for rooms and live player tracking.
+
+2. **Real Cloud Room Repository (`RealGameRoomRepository.kt`)**:
+   - `createRoom(roomConfig, hostPlayer)`: Creates document in `rooms/{code}`.
+   - `joinRoom(code, player)`: Adds player to `rooms/{code}/players/{userId}`.
+   - `observeRoom(code)`: Returns a Flow/StateFlow of connected real players and room state.
+   - `updatePlayerLocation(code, userId, lat, lon, accuracy)`: Continuously syncs live GPS coordinates during match.
+   - `startMatch(code)`: Host updates room status to `"ACTIVE"`, automatically transitioning all connected phones to the live arena.
+
+3. **Lobby Overhaul (`LobbyScreen.kt`)**:
+   - Remove bot slots and bot generation buttons.
+   - Display real human player cards with live status indicators.
+   - Lock match start until `players.size >= 3`.
+   - Start button unlocks only when 3 or more real humans are connected.
+
+4. **Pure GPS Arena (`RealOutdoorArenaScreen.kt` & `RealOutdoorGameEngine.kt`)**:
+   - Connect live GPS updates of all squad members from Firestore to the `DarkTacticalMap`.
+   - Geographically locked 1.0 km safe zone.
+   - Dynamic GPS accuracy ring and live telemetry badge.
+   - Proximity detection ($\le 8\text{m}$) using real coordinates from all connected players.

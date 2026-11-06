@@ -313,8 +313,8 @@ fun DarkTacticalMap(
                     val pScreen = latLonToScreen(player.latitude, player.longitude)
 
                     if (player.role == PlayerRole.SEEKER) {
-                        // Seeker/Hunter: Visible to Hiders ONLY during 1:30 radar reveal (sonarActive). Otherwise strictly NOT visible!
-                        val isSeekerVisible = isSeeker || sonarActive
+                        // Seeker/Hunter: Visible ONLY to other Seekers/Hunters on the same team. Seeker location is NEVER revealed to Hiders!
+                        val isSeekerVisible = isSeeker
 
                         if (isSeekerVisible) {
                             val captureHaloRadiusPx = metersToPixels(20f)
@@ -347,8 +347,8 @@ fun DarkTacticalMap(
                             )
                         }
                     } else {
-                        // Runner/Hider: Visible to Seekers ONLY during 1:30 radar reveal (sonarActive). Otherwise strictly NOT visible!
-                        val isRunnerVisible = (!isSeeker) || sonarActive
+                        // Runner/Hider: Visible to fellow runners on their team
+                        val isRunnerVisible = !isSeeker
                         if (isRunnerVisible) {
                             // Green glowing pin
                             drawCircle(
