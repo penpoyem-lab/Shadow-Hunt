@@ -33,6 +33,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.*
 
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.draw.scale
+
 @Composable
 fun NeonGamingButton(
     text: String,
@@ -40,83 +43,148 @@ fun NeonGamingButton(
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
     trailingText: String? = ">>",
-    gradientColors: List<Color> = listOf(Color(0xFFFF1E43), Color(0xFFD50000)),
+    gradientColors: List<Color> = listOf(LiquidCrimsonCoral, LiquidCrimsonOrange),
     borderColor: Color = Color(0xFFFF5252),
-    height: Dp = 56.dp,
+    waterShadowColor: Color = WaterShadowCrimson,
+    height: Dp = 58.dp,
     enabled: Boolean = true
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.6f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1400, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
+    LiquidGlassButton(
+        text = text,
+        onClick = onClick,
+        modifier = modifier,
+        icon = icon,
+        trailingText = trailingText,
+        gradientColors = gradientColors,
+        waterShadowColor = waterShadowColor,
+        height = height,
+        enabled = enabled
+    )
+}
+
+@Composable
+fun LiquidGlassButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+    trailingText: String? = ">>",
+    gradientColors: List<Color> = listOf(LiquidCrimsonCoral, LiquidCrimsonOrange),
+    waterShadowColor: Color = WaterShadowCrimson,
+    height: Dp = 58.dp,
+    shape: Shape = RoundedCornerShape(30.dp),
+    enabled: Boolean = true
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.96f else 1.0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
         ),
-        label = "glowAlpha"
+        label = "liquidButtonScale"
     )
 
-    Surface(
+    val infiniteTransition = rememberInfiniteTransition(label = "liquidGlow")
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.7f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "liquidGlowAlpha"
+    )
+
+    Box(
         modifier = modifier
             .fillMaxWidth()
+            .scale(scale)
             .height(height)
+            // Liquid Water Drop Shadow (Diffusion pool)
             .shadow(
-                elevation = 12.dp,
-                shape = RoundedCornerShape(28.dp),
-                ambientColor = borderColor.copy(alpha = glowAlpha * 0.5f),
-                spotColor = borderColor.copy(alpha = glowAlpha)
+                elevation = if (isPressed) 6.dp else 16.dp,
+                shape = shape,
+                ambientColor = waterShadowColor.copy(alpha = if (enabled) 0.5f * glowAlpha else 0.15f),
+                spotColor = waterShadowColor.copy(alpha = if (enabled) 0.85f * glowAlpha else 0.25f)
             )
-            .clip(RoundedCornerShape(28.dp))
-            .clickable(
-                enabled = enabled,
-                onClick = onClick
-            ),
-        shape = RoundedCornerShape(28.dp),
-        border = BorderStroke(1.8.dp, borderColor.copy(alpha = if (enabled) glowAlpha else 0.3f)),
-        color = Color.Transparent
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    brush = Brush.horizontalGradient(
-                        colors = if (enabled) gradientColors else listOf(Color(0xFF2A2D3D), Color(0xFF1E202C))
+            .clip(shape)
+            .background(
+                brush = Brush.horizontalGradient(
+                    colors = if (enabled) gradientColors else listOf(Color(0xFF242938), Color(0xFF191C28))
+                )
+            )
+            // Dual specular glass border (surface tension highlight at top)
+            .border(
+                width = 1.5.dp,
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xAAFFFFFF), // Specular light highlight on top curved rim
+                        waterShadowColor.copy(alpha = 0.6f),
+                        Color(0x33000000)
                     )
                 ),
-            contentAlignment = Alignment.Center
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
-                modifier = Modifier.padding(horizontal = 20.dp)
-            ) {
-                if (icon != null) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                }
-                Text(
-                    text = text,
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 1.5.sp,
-                        color = Color.White
-                    )
-                )
-                if (trailingText != null) {
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = trailingText,
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Black,
-                            color = Color.White.copy(alpha = 0.85f)
+                shape = shape
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                enabled = enabled,
+                onClick = onClick
+            )
+    ) {
+        // Top Glass Specular Arc Reflection (Lens refraction)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.48f)
+                .align(Alignment.TopCenter)
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0x55FFFFFF),
+                            Color(0x15FFFFFF),
+                            Color.Transparent
                         )
                     )
-                }
+                )
+        )
+
+        // Button Content with crisp typography
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp)
+        ) {
+            if (icon != null) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+            }
+            Text(
+                text = text,
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 1.3.sp,
+                    color = Color.White
+                )
+            )
+            if (trailingText != null) {
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = trailingText,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Black,
+                        color = Color.White.copy(alpha = 0.9f)
+                    )
+                )
             }
         }
     }
@@ -127,16 +195,52 @@ fun GlassPanel(
     modifier: Modifier = Modifier,
     borderColor: Color = DarkCardBorder,
     backgroundColor: Color = DarkSurfaceGlass,
-    shape: Shape = RoundedCornerShape(16.dp),
+    waterShadowColor: Color = WaterShadowAqua.copy(alpha = 0.35f),
+    shape: Shape = RoundedCornerShape(20.dp),
     borderWidth: Dp = 1.2.dp,
+    elevation: Dp = 10.dp,
     content: @Composable BoxScope.() -> Unit
 ) {
     Box(
         modifier = modifier
+            .shadow(
+                elevation = elevation,
+                shape = shape,
+                ambientColor = waterShadowColor,
+                spotColor = waterShadowColor.copy(alpha = 0.45f)
+            )
             .clip(shape)
             .background(backgroundColor)
-            .border(borderWidth, borderColor, shape)
+            .border(
+                width = borderWidth,
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0x66FFFFFF),
+                        borderColor,
+                        borderColor.copy(alpha = 0.4f)
+                    )
+                ),
+                shape = shape
+            )
     ) {
+        // Specular sheen top edge line
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.5.dp)
+                .align(Alignment.TopCenter)
+                .background(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color(0x66FFFFFF),
+                            Color(0x9900F2FE),
+                            Color(0x66FFFFFF),
+                            Color.Transparent
+                        )
+                    )
+                )
+        )
         content()
     }
 }

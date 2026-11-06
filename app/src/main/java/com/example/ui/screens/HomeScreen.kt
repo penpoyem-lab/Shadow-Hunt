@@ -24,12 +24,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.draw.shadow
 import com.example.R
 import com.example.model.UserProfileData
 import com.example.ui.components.BannerSlide
 import com.example.ui.components.GlassPanel
 import com.example.ui.components.GooglePlayPullToRefresh
 import com.example.ui.components.HeroBannerCarousel
+import com.example.ui.components.LiquidGlassButton
 import com.example.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -105,33 +107,59 @@ fun HomeScreen(
             horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Sound Mute Toggle Button
-            IconButton(
-                onClick = { isMuted = !isMuted },
+            // Sound Mute Toggle Button with Water Shadow & Liquid Glass Capsule
+            Box(
                 modifier = Modifier
-                    .size(42.dp)
+                    .size(44.dp)
+                    .shadow(
+                        elevation = 8.dp,
+                        shape = CircleShape,
+                        ambientColor = WaterShadowAqua.copy(alpha = 0.4f),
+                        spotColor = WaterShadowCyan.copy(alpha = 0.6f)
+                    )
                     .clip(CircleShape)
-                    .background(Color(0xFF131726))
-                    .border(1.dp, Color(0xFF2E334D), CircleShape)
+                    .background(Color(0xCC0D1222))
+                    .border(
+                        1.4.dp,
+                        Brush.verticalGradient(
+                            listOf(Color(0x88FFFFFF), Color(0x3300F2FE), Color(0x10000000))
+                        ),
+                        CircleShape
+                    )
+                    .clickable { isMuted = !isMuted },
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = if (isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
                     contentDescription = "Sound Toggle",
-                    tint = Color.White,
+                    tint = if (isMuted) TextMuted else LiquidAuroraCyan,
                     modifier = Modifier.size(20.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.width(10.dp))
+            Spacer(modifier = Modifier.width(12.dp))
 
-            // Settings Gear Button
-            IconButton(
-                onClick = onOpenSettings,
+            // Settings Gear Button with Water Shadow & Liquid Glass Capsule
+            Box(
                 modifier = Modifier
-                    .size(42.dp)
+                    .size(44.dp)
+                    .shadow(
+                        elevation = 8.dp,
+                        shape = CircleShape,
+                        ambientColor = WaterShadowAqua.copy(alpha = 0.4f),
+                        spotColor = WaterShadowCyan.copy(alpha = 0.6f)
+                    )
                     .clip(CircleShape)
-                    .background(Color(0xFF131726))
-                    .border(1.dp, Color(0xFF2E334D), CircleShape)
+                    .background(Color(0xCC0D1222))
+                    .border(
+                        1.4.dp,
+                        Brush.verticalGradient(
+                            listOf(Color(0x88FFFFFF), Color(0x3300F2FE), Color(0x10000000))
+                        ),
+                        CircleShape
+                    )
+                    .clickable(onClick = onOpenSettings),
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.Settings,
@@ -159,44 +187,85 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // CARD 1: REJOIN YOUR GAME (Room Code: SH7KQ2)
-            Surface(
-                onClick = onRejoinRoom,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
-                color = Color(0xFF0F1322),
-                border = BorderStroke(
-                    width = 2.dp,
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(
-                            Color(0xFFFF1744),
-                            Color(0xFF9C27B0),
-                            Color(0xFF00E5FF)
+            // CARD 1: REJOIN YOUR GAME (Room Code: SH7KQ2) - Liquid Glass Capsule Card with Water Shadow
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .shadow(
+                        elevation = 16.dp,
+                        shape = RoundedCornerShape(26.dp),
+                        ambientColor = WaterShadowCrimson.copy(alpha = 0.4f),
+                        spotColor = WaterShadowAqua.copy(alpha = 0.5f)
+                    )
+                    .clip(RoundedCornerShape(26.dp))
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0xE60F1426),
+                                Color(0xF2090C16)
+                            )
                         )
                     )
-                )
+                    .border(
+                        width = 1.8.dp,
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0xAAFFFFFF),
+                                Color(0x66FF1744),
+                                Color(0x4400E5FF),
+                                Color(0x10000000)
+                            )
+                        ),
+                        shape = RoundedCornerShape(26.dp)
+                    )
+                    .clickable(onClick = onRejoinRoom)
             ) {
+                // Top Specular Glass Sheen
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(2.dp)
+                        .align(Alignment.TopCenter)
+                        .background(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color(0x88FFFFFF),
+                                    Color(0xCC00F2FE),
+                                    Color(0x88FFFFFF),
+                                    Color.Transparent
+                                )
+                            )
+                        )
+                )
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                        .padding(horizontal = 18.dp, vertical = 16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Left Circular Red Replay Icon
+                    // Left Circular Red Replay Icon with Liquid Glow
                     Box(
                         modifier = Modifier
-                            .size(48.dp)
+                            .size(50.dp)
+                            .shadow(
+                                elevation = 8.dp,
+                                shape = CircleShape,
+                                ambientColor = WaterShadowCrimson.copy(alpha = 0.5f),
+                                spotColor = WaterShadowCrimson
+                            )
                             .clip(CircleShape)
-                            .background(Color(0xFF2A101A))
-                            .border(1.5.dp, Color(0xFFFF1744), CircleShape),
+                            .background(Color(0xFF2A101C))
+                            .border(1.6.dp, LiquidCrimsonCoral, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.Replay,
                             contentDescription = "Rejoin",
-                            tint = Color(0xFFFF1744),
+                            tint = LiquidCrimsonCoral,
                             modifier = Modifier.size(26.dp)
                         )
                     }
@@ -214,17 +283,17 @@ fun HomeScreen(
                             ),
                             color = Color.White
                         )
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.height(3.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = "Room Code: ",
                                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                                color = Color(0xFFB0B7C3)
+                                color = TextSecondary
                             )
                             Text(
                                 text = activeRoomCode,
                                 style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black),
-                                color = Color(0xFFFF1744)
+                                color = LiquidCrimsonCoral
                             )
                         }
                     }
@@ -233,7 +302,7 @@ fun HomeScreen(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
                         contentDescription = "Enter",
-                        tint = Color.White.copy(alpha = 0.8f),
+                        tint = Color.White.copy(alpha = 0.85f),
                         modifier = Modifier.size(18.dp)
                     )
 
@@ -244,7 +313,7 @@ fun HomeScreen(
                         modifier = Modifier
                             .width(1.dp)
                             .height(34.dp)
-                            .background(Color(0xFF2E334D))
+                            .background(Color(0xFF2E3552))
                     )
 
                     Spacer(modifier = Modifier.width(12.dp))
@@ -257,140 +326,92 @@ fun HomeScreen(
                         Icon(
                             imageVector = Icons.Default.Groups,
                             contentDescription = null,
-                            tint = Color(0xFF8C98B2),
+                            tint = LiquidAuroraCyan,
                             modifier = Modifier.size(22.dp)
                         )
                         Text(
                             text = "2-10",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black),
                             color = Color.White
                         )
                         Text(
                             text = "Players",
                             style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                            color = Color(0xFF8C98B2)
+                            color = TextSecondary
                         )
                     }
                 }
             }
 
-            // BUTTON 2: CREATE A GAME >> (Large Neon Red Pill Button)
-            Surface(
+            // BUTTON 2: CREATE A GAME >> (Liquid Glass Capsule Button with Water Shadow)
+            LiquidGlassButton(
+                text = "CREATE A GAME",
                 onClick = onCreateRoom,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(64.dp),
-                shape = RoundedCornerShape(22.dp),
-                color = Color.Transparent,
-                border = BorderStroke(2.dp, Color(0xFFFF3366))
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            brush = Brush.horizontalGradient(
-                                colors = listOf(Color(0xFFFF1744), Color(0xFFD50000))
-                            )
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.SportsEsports,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(28.dp)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = "CREATE A GAME",
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Black,
-                                fontStyle = FontStyle.Italic,
-                                letterSpacing = 1.sp
-                            ),
-                            color = Color.White
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = ">>",
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Black,
-                                letterSpacing = 2.sp
-                            ),
-                            color = Color(0xFFFF80AB)
-                        )
-                    }
-                }
-            }
+                icon = Icons.Default.SportsEsports,
+                trailingText = ">>",
+                gradientColors = listOf(LiquidCrimsonCoral, LiquidCrimsonOrange),
+                waterShadowColor = WaterShadowCrimson,
+                height = 64.dp
+            )
 
-            // BUTTON 3: JOIN WITH CODE >> (Large Neon Purple Pill Button)
-            Surface(
+            // BUTTON 3: JOIN WITH CODE >> (Liquid Glass Capsule Button with Water Shadow)
+            LiquidGlassButton(
+                text = "JOIN WITH CODE",
                 onClick = onJoinRoom,
+                icon = Icons.Default.VpnKey,
+                trailingText = ">>",
+                gradientColors = listOf(RoyalCyberIris, NeonOrchidPink),
+                waterShadowColor = WaterShadowPurple,
+                height = 64.dp
+            )
+
+            // CARD 4: GLOBAL CHAT LIVE - Liquid Glass Capsule Card with Water Shadow
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(64.dp),
-                shape = RoundedCornerShape(22.dp),
-                color = Color.Transparent,
-                border = BorderStroke(2.dp, Color(0xFF7C4DFF))
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            brush = Brush.horizontalGradient(
-                                colors = listOf(Color(0xFF651FFF), Color(0xFF4A148C))
+                    .shadow(
+                        elevation = 14.dp,
+                        shape = RoundedCornerShape(24.dp),
+                        ambientColor = WaterShadowAqua.copy(alpha = 0.35f),
+                        spotColor = WaterShadowCyan.copy(alpha = 0.5f)
+                    )
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(Color(0xE60D1224), Color(0xF2080B16))
+                        )
+                    )
+                    .border(
+                        width = 1.5.dp,
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0x88FFFFFF),
+                                Color(0x5500F2FE),
+                                Color(0x10000000)
                             )
                         ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.VpnKey,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(26.dp)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = "JOIN WITH CODE",
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Black,
-                                fontStyle = FontStyle.Italic,
-                                letterSpacing = 1.sp
-                            ),
-                            color = Color.White
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = ">>",
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Black,
-                                letterSpacing = 2.sp
-                            ),
-                            color = Color(0xFFB388FF)
-                        )
-                    }
-                }
-            }
-
-            // CARD 4: GLOBAL CHAT LIVE
-            Surface(
-                onClick = { showChatDialog = true },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
-                color = Color(0xFF0D1222),
-                border = BorderStroke(
-                    width = 1.5.dp,
-                    color = Color(0xFF00E5FF).copy(alpha = 0.5f)
-                )
+                        shape = RoundedCornerShape(24.dp)
+                    )
+                    .clickable { showChatDialog = true }
             ) {
+                // Top Specular Sheen
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.5.dp)
+                        .align(Alignment.TopCenter)
+                        .background(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color(0x66FFFFFF),
+                                    Color(0x9900F2FE),
+                                    Color(0x66FFFFFF),
+                                    Color.Transparent
+                                )
+                            )
+                        )
+                )
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -514,41 +535,83 @@ fun HomeScreen(
                 }
             }
 
-            // ACTION: Already have an account? Restore it
-            Row(
+            // ACTION: Already have an account? Restore it - Liquid Capsule Button with Water Shadow
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { showRestoreDialog = true }
                     .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
+                contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.Sync,
-                    contentDescription = null,
-                    tint = Color(0xFFB0B7C3),
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "Already have an account? Restore it",
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontWeight = FontWeight.Medium,
-                        letterSpacing = 0.5.sp
-                    ),
-                    color = Color(0xFFB0B7C3)
-                )
+                Box(
+                    modifier = Modifier
+                        .shadow(
+                            elevation = 8.dp,
+                            shape = RoundedCornerShape(24.dp),
+                            ambientColor = WaterShadowAqua.copy(alpha = 0.25f),
+                            spotColor = Color.Black
+                        )
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(Color(0xCC0D1222))
+                        .border(
+                            1.2.dp,
+                            Brush.verticalGradient(
+                                listOf(Color(0x66FFFFFF), Color(0x3300F2FE), Color(0x10000000))
+                            ),
+                            RoundedCornerShape(24.dp)
+                        )
+                        .clickable { showRestoreDialog = true }
+                        .padding(horizontal = 22.dp, vertical = 10.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Sync,
+                            contentDescription = null,
+                            tint = LiquidAuroraCyan,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Already have an account? Restore it",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.5.sp
+                            ),
+                            color = Color.White
+                        )
+                    }
+                }
             }
 
-            // LIVE REAL-WORLD TELEMETRY STATUS (Replaces all demo numbers)
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
-                color = Color(0xFF0F1322),
-                border = BorderStroke(
-                    width = 1.5.dp,
-                    color = ElectricBlue.copy(alpha = 0.5f)
-                )
+            // LIVE REAL-WORLD TELEMETRY STATUS - Liquid Glass Capsule Card with Water Shadow
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .shadow(
+                        elevation = 14.dp,
+                        shape = RoundedCornerShape(24.dp),
+                        ambientColor = WaterShadowEmerald.copy(alpha = 0.35f),
+                        spotColor = WaterShadowAqua.copy(alpha = 0.45f)
+                    )
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(Color(0xE60D1426), Color(0xF2080B16))
+                        )
+                    )
+                    .border(
+                        width = 1.5.dp,
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0x88FFFFFF),
+                                Color(0x5500F5A0),
+                                Color(0x10000000)
+                            )
+                        ),
+                        shape = RoundedCornerShape(24.dp)
+                    )
             ) {
                 Row(
                     modifier = Modifier
@@ -654,7 +717,6 @@ fun HomeScreen(
             }
         }
     }
-}
 
     // Account Restore Dialog
     if (showRestoreDialog) {
@@ -710,4 +772,5 @@ fun HomeScreen(
             containerColor = DarkSurfaceVariant
         )
     }
+}
 }

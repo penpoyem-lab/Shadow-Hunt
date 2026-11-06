@@ -281,28 +281,16 @@ fun JoinRoomScreen(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // SCAN INVITE QR BUTTON
-            OutlinedButton(
+            // SCAN INVITE QR BUTTON with Liquid Glass Capsule & Water Shadow
+            LiquidGlassButton(
+                text = "SCAN INVITE QR",
                 onClick = { showScannerDialog = true },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                shape = RoundedCornerShape(25.dp),
-                border = BorderStroke(1.2.dp, ElectricBlue.copy(alpha = 0.6f))
-            ) {
-                Icon(
-                    imageVector = Icons.Default.QrCode,
-                    contentDescription = null,
-                    tint = ElectricBlue,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "SCAN INVITE QR",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = ElectricBlue
-                )
-            }
+                icon = Icons.Default.QrCode,
+                trailingText = null,
+                gradientColors = listOf(LiquidAuroraCyan, LiquidSapphireBlue),
+                waterShadowColor = WaterShadowAqua,
+                height = 52.dp
+            )
 
             Spacer(modifier = Modifier.height(20.dp))
 

@@ -16,6 +16,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -78,17 +80,30 @@ fun LobbyScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            IconButton(
-                onClick = onLeaveLobby,
+            Box(
                 modifier = Modifier
-                    .size(42.dp)
+                    .size(44.dp)
+                    .shadow(
+                        elevation = 8.dp,
+                        shape = CircleShape,
+                        ambientColor = Color.Black.copy(alpha = 0.5f),
+                        spotColor = Color.Black
+                    )
                     .clip(CircleShape)
-                    .background(DarkSurfaceVariant)
+                    .background(Color(0xCC0D1222))
+                    .border(
+                        1.2.dp,
+                        Brush.verticalGradient(listOf(Color(0x66FFFFFF), DarkCardBorder)),
+                        CircleShape
+                    )
+                    .clickable(onClick = onLeaveLobby),
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.ArrowBack,
                     contentDescription = "Leave",
-                    tint = Color.White
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp)
                 )
             }
 
@@ -108,25 +123,39 @@ fun LobbyScreen(
                 )
             }
 
-            Button(
-                onClick = onLeaveLobby,
-                colors = ButtonDefaults.buttonColors(containerColor = NeonRed.copy(alpha = 0.2f)),
-                border = BorderStroke(1.dp, NeonRed),
-                shape = RoundedCornerShape(12.dp),
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+            // Leave Button with Water Shadow & Liquid Glass Capsule
+            Box(
+                modifier = Modifier
+                    .shadow(
+                        elevation = 8.dp,
+                        shape = RoundedCornerShape(20.dp),
+                        ambientColor = WaterShadowCrimson.copy(alpha = 0.4f),
+                        spotColor = WaterShadowCrimson
+                    )
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color(0x33FF1744))
+                    .border(
+                        1.2.dp,
+                        Brush.verticalGradient(listOf(Color(0x88FFFFFF), LiquidCrimsonCoral)),
+                        RoundedCornerShape(20.dp)
+                    )
+                    .clickable(onClick = onLeaveLobby)
+                    .padding(horizontal = 14.dp, vertical = 7.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.ExitToApp,
-                    contentDescription = null,
-                    tint = NeonRed,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "Leave",
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                    color = NeonRed
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.ExitToApp,
+                        contentDescription = null,
+                        tint = LiquidCrimsonCoral,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Leave",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black),
+                        color = Color.White
+                    )
+                }
             }
         }
 
@@ -163,23 +192,36 @@ fun LobbyScreen(
                             )
                         }
 
-                        IconButton(
-                            onClick = {
-                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                val clip = ClipData.newPlainText("Shadow Hunt Room Code", roomConfig.code)
-                                clipboard.setPrimaryClip(clip)
-                                Toast.makeText(context, "Room Code Copied!", Toast.LENGTH_SHORT).show()
-                            },
+                        // Copy Code Button with Water Shadow
+                        Box(
                             modifier = Modifier
                                 .size(48.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(DarkSurfaceVariant)
-                                .border(1.dp, ElectricBlue, RoundedCornerShape(14.dp))
+                                .shadow(
+                                    elevation = 8.dp,
+                                    shape = RoundedCornerShape(16.dp),
+                                    ambientColor = WaterShadowAqua.copy(alpha = 0.4f),
+                                    spotColor = LiquidAuroraCyan
+                                )
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Color(0xCC0D1222))
+                                .border(
+                                    1.4.dp,
+                                    Brush.verticalGradient(listOf(Color(0x88FFFFFF), LiquidAuroraCyan)),
+                                    RoundedCornerShape(16.dp)
+                                )
+                                .clickable {
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    val clip = ClipData.newPlainText("Shadow Hunt Room Code", roomConfig.code)
+                                    clipboard.setPrimaryClip(clip)
+                                    Toast.makeText(context, "Room Code Copied!", Toast.LENGTH_SHORT).show()
+                                },
+                            contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.ContentCopy,
                                 contentDescription = "Copy Code",
-                                tint = ElectricBlue
+                                tint = LiquidAuroraCyan,
+                                modifier = Modifier.size(22.dp)
                             )
                         }
                     }
@@ -187,59 +229,39 @@ fun LobbyScreen(
                     Spacer(modifier = Modifier.height(14.dp))
 
                     if (isHost) {
-                        // Host Only Share & QR Buttons
+                        // Host Only Share & QR Buttons with Liquid Glass & Water Shadow
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Button(
-                                onClick = {
-                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                    val clip = ClipData.newPlainText("Shadow Hunt Room", "Join my Shadow Hunt Squad! Code: ${roomConfig.code}\nLink: https://shadowhunt.app/room/${roomConfig.code}")
-                                    clipboard.setPrimaryClip(clip)
-                                    Toast.makeText(context, "Room Code & Link copied (Host share)!", Toast.LENGTH_SHORT).show()
-                                },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(44.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = NeonPurple.copy(alpha = 0.25f)),
-                                border = BorderStroke(1.2.dp, NeonPurple),
-                                shape = RoundedCornerShape(14.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Share,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
+                            Box(modifier = Modifier.weight(1f)) {
+                                LiquidGlassButton(
                                     text = "Share Code",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                    color = Color.White
+                                    onClick = {
+                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                        val clip = ClipData.newPlainText("Shadow Hunt Room", "Join my Shadow Hunt Squad! Code: ${roomConfig.code}\nLink: https://shadowhunt.app/room/${roomConfig.code}")
+                                        clipboard.setPrimaryClip(clip)
+                                        Toast.makeText(context, "Room Code & Link copied (Host share)!", Toast.LENGTH_SHORT).show()
+                                    },
+                                    icon = Icons.Default.Share,
+                                    trailingText = null,
+                                    gradientColors = listOf(RoyalCyberIris, NeonOrchidPink),
+                                    waterShadowColor = WaterShadowPurple,
+                                    height = 46.dp,
+                                    shape = RoundedCornerShape(23.dp)
                                 )
                             }
 
-                            Button(
-                                onClick = { showRoomQrDialog = true },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(44.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = ElectricBlue.copy(alpha = 0.25f)),
-                                border = BorderStroke(1.2.dp, ElectricBlue),
-                                shape = RoundedCornerShape(14.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.QrCode,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
+                            Box(modifier = Modifier.weight(1f)) {
+                                LiquidGlassButton(
                                     text = "Show QR",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                    color = Color.White
+                                    onClick = { showRoomQrDialog = true },
+                                    icon = Icons.Default.QrCode,
+                                    trailingText = null,
+                                    gradientColors = listOf(LiquidAuroraCyan, LiquidSapphireBlue),
+                                    waterShadowColor = WaterShadowAqua,
+                                    height = 46.dp,
+                                    shape = RoundedCornerShape(23.dp)
                                 )
                             }
                         }

@@ -28,6 +28,7 @@ import com.example.model.GamePhase
 import com.example.model.PlayerRole
 import com.example.ui.components.GameLockExitDialog
 import com.example.ui.components.GlassPanel
+import com.example.ui.components.LiquidGlassButton
 import com.example.ui.components.NeonGamingButton
 import com.example.ui.map.DarkTacticalMap
 import com.example.ui.map.LeafletMapView
@@ -442,21 +443,36 @@ fun RealOutdoorArenaScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Recenter Map on Player's Exact GPS Location
-            FloatingActionButton(
-                onClick = {
-                    recenterTrigger++
-                },
-                containerColor = Color(0xFF0F1322),
-                contentColor = ElectricBlue,
-                shape = CircleShape,
+            // Recenter Map on Player's Exact GPS Location - Liquid Glass Capsule with Water Shadow
+            Box(
                 modifier = Modifier
-                    .size(48.dp)
-                    .border(1.5.dp, ElectricBlue, CircleShape)
+                    .size(52.dp)
+                    .shadow(
+                        elevation = 14.dp,
+                        shape = CircleShape,
+                        ambientColor = WaterShadowAqua.copy(alpha = 0.5f),
+                        spotColor = WaterShadowCyan.copy(alpha = 0.6f)
+                    )
+                    .clip(CircleShape)
+                    .background(
+                        brush = Brush.verticalGradient(
+                            listOf(Color(0xE612192E), Color(0xF2090C16))
+                        )
+                    )
+                    .border(
+                        width = 1.5.dp,
+                        brush = Brush.verticalGradient(
+                            listOf(Color(0x99FFFFFF), LiquidAuroraCyan, Color(0x15000000))
+                        ),
+                        shape = CircleShape
+                    )
+                    .clickable { recenterTrigger++ },
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.MyLocation,
                     contentDescription = "Recenter on My Location",
+                    tint = LiquidAuroraCyan,
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -513,13 +529,15 @@ fun RealOutdoorArenaScreen(
                             }
                         }
 
-                        Button(
+                        LiquidGlassButton(
+                            text = "SNAP",
                             onClick = { isCameraActive = true },
-                            colors = ButtonDefaults.buttonColors(containerColor = NeonRed),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text(text = "SNAP", fontWeight = FontWeight.Black)
-                        }
+                            icon = Icons.Default.CameraAlt,
+                            trailingText = null,
+                            gradientColors = listOf(LiquidCrimsonCoral, LiquidCrimsonOrange),
+                            waterShadowColor = WaterShadowCrimson,
+                            modifier = Modifier.height(44.dp)
+                        )
                     }
                 }
             }

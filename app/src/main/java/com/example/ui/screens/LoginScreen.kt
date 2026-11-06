@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.ui.components.GlassPanel
+import com.example.ui.components.LiquidGlassButton
 import com.example.ui.components.NeonGamingButton
 import com.example.ui.theme.*
 
@@ -343,29 +344,16 @@ fun LoginScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Guest Login Option
-                    OutlinedButton(
+                    // Guest Login Option with Liquid Glass Capsule & Water Shadow
+                    LiquidGlassButton(
+                        text = "QUICK GUEST ACCESS",
                         onClick = onGuestLogin,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(50.dp),
-                        shape = RoundedCornerShape(14.dp),
-                        border = BorderStroke(1.dp, ElectricBlue.copy(alpha = 0.6f)),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = ElectricBlue
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.DirectionsRun,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "QUICK GUEST ACCESS >>",
-                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
-                        )
-                    }
+                        icon = Icons.Default.DirectionsRun,
+                        trailingText = ">>",
+                        gradientColors = listOf(LiquidAuroraCyan, LiquidSapphireBlue),
+                        waterShadowColor = WaterShadowAqua,
+                        height = 50.dp
+                    )
                 }
             }
 

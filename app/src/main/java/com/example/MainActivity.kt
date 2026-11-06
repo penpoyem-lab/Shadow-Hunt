@@ -27,6 +27,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -625,22 +626,83 @@ fun LiquidGlassBottomBar(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .padding(horizontal = 16.dp, vertical = 10.dp)
             .navigationBarsPadding()
     ) {
-        Surface(
+        // Outer Fluid Water Shadow Pool
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(64.dp)
-                .clip(RoundedCornerShape(32.dp)),
-            color = Color(0xE60E101E),
-            shape = RoundedCornerShape(32.dp),
-            border = BorderStroke(1.2.dp, Color(0xFF282B48))
+                .height(68.dp)
+                .shadow(
+                    elevation = 20.dp,
+                    shape = RoundedCornerShape(36.dp),
+                    ambientColor = WaterShadowAqua.copy(alpha = 0.5f),
+                    spotColor = WaterShadowCyan.copy(alpha = 0.75f)
+                )
+                .clip(RoundedCornerShape(36.dp))
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xE60D1224), // Translucent deep sapphire crystal
+                            Color(0xF0070A14)
+                        )
+                    )
+                )
+                // Dual Specular Glass Border (Light refraction on surface tension)
+                .border(
+                    width = 1.6.dp,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xCCFFFFFF),       // Top specular rim glint
+                            Color(0x5500F2FE),       // Mid aqua caustic
+                            Color(0x22FFFFFF),
+                            Color(0x10000000)
+                        )
+                    ),
+                    shape = RoundedCornerShape(36.dp)
+                )
         ) {
+            // Top Glass Specular Arc / Lens Refraction Highlight
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(26.dp)
+                    .align(Alignment.TopCenter)
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0x35FFFFFF),
+                                Color(0x08FFFFFF),
+                                Color.Transparent
+                            )
+                        )
+                    )
+            )
+
+            // Top Specular Thin Edge Sheen
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.5.dp)
+                    .align(Alignment.TopCenter)
+                    .background(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color(0x88FFFFFF),
+                                Color(0xCC00F2FE),
+                                Color(0x88FFFFFF),
+                                Color.Transparent
+                            )
+                        )
+                    )
+            )
+
             Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 8.dp),
+                    .padding(horizontal = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceAround
             ) {
@@ -648,35 +710,40 @@ fun LiquidGlassBottomBar(
                     label = "Home",
                     icon = Icons.Default.Home,
                     isSelected = selectedTab == NavigationTab.HOME,
-                    activeColor = NeonRed,
+                    activeColor = LiquidCrimsonCoral,
+                    activeWaterGlow = WaterShadowCrimson,
                     onClick = { onTabSelect(NavigationTab.HOME) }
                 )
                 BottomNavItem(
                     label = "Play",
                     icon = Icons.Default.SportsEsports,
                     isSelected = selectedTab == NavigationTab.PLAY,
-                    activeColor = ElectricBlue,
+                    activeColor = LiquidAuroraCyan,
+                    activeWaterGlow = WaterShadowAqua,
                     onClick = { onTabSelect(NavigationTab.PLAY) }
                 )
                 BottomNavItem(
                     label = "Friends",
                     icon = Icons.Default.People,
                     isSelected = selectedTab == NavigationTab.FRIENDS,
-                    activeColor = NeonPurple,
+                    activeColor = RoyalCyberIris,
+                    activeWaterGlow = WaterShadowPurple,
                     onClick = { onTabSelect(NavigationTab.FRIENDS) }
                 )
                 BottomNavItem(
                     label = "Last Wall",
                     icon = Icons.Default.FilterFrames,
                     isSelected = selectedTab == NavigationTab.LAST_WALL,
-                    activeColor = GoldAccent,
+                    activeColor = SolarAmberGold,
+                    activeWaterGlow = WaterShadowAmber,
                     onClick = { onTabSelect(NavigationTab.LAST_WALL) }
                 )
                 BottomNavItem(
                     label = "Profile",
                     icon = Icons.Default.Person,
                     isSelected = selectedTab == NavigationTab.PROFILE,
-                    activeColor = NeonPurple,
+                    activeColor = LiquidEmeraldJade,
+                    activeWaterGlow = WaterShadowEmerald,
                     onClick = { onTabSelect(NavigationTab.PROFILE) }
                 )
             }
@@ -690,36 +757,85 @@ private fun BottomNavItem(
     icon: ImageVector,
     isSelected: Boolean,
     activeColor: Color,
+    activeWaterGlow: Color,
     onClick: () -> Unit
 ) {
-    val animatedBgColor by animateColorAsState(
-        targetValue = if (isSelected) activeColor.copy(alpha = 0.2f) else Color.Transparent,
-        animationSpec = tween(300),
-        label = "tabBg"
+    val animatedScale by animateFloatAsState(
+        targetValue = if (isSelected) 1.05f else 1.0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "tabScale"
     )
 
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
+    Box(
+        contentAlignment = Alignment.Center,
         modifier = Modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(animatedBgColor)
+            .clip(RoundedCornerShape(24.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .padding(horizontal = 6.dp, vertical = 4.dp)
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = label,
-            tint = if (isSelected) activeColor else TextMuted,
-            modifier = Modifier.size(22.dp)
-        )
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall.copy(
-                fontSize = 10.sp,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-            ),
-            color = if (isSelected) Color.White else TextMuted
-        )
+        if (isSelected) {
+            // Liquid Droplet Capsule Background Pill with Water Glow
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .shadow(
+                        elevation = 8.dp,
+                        shape = RoundedCornerShape(22.dp),
+                        ambientColor = activeWaterGlow.copy(alpha = 0.5f),
+                        spotColor = activeWaterGlow
+                    )
+                    .clip(RoundedCornerShape(22.dp))
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                activeColor.copy(alpha = 0.28f),
+                                activeColor.copy(alpha = 0.08f)
+                            )
+                        )
+                    )
+                    .border(
+                        width = 1.2.dp,
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0x99FFFFFF),
+                                activeColor.copy(alpha = 0.6f)
+                            )
+                        ),
+                        shape = RoundedCornerShape(22.dp)
+                    )
+            )
+        }
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = if (isSelected) activeColor else TextMuted,
+                modifier = Modifier.size(22.dp)
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = 10.sp,
+                    fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium,
+                    letterSpacing = 0.3.sp
+                ),
+                color = if (isSelected) Color.White else TextMuted
+            )
+            if (isSelected) {
+                // Micro Liquid Glow Dot Indicator
+                Box(
+                    modifier = Modifier
+                        .padding(top = 2.dp)
+                        .size(4.dp)
+                        .clip(CircleShape)
+                        .background(activeColor)
+                )
+            }
+        }
     }
 }

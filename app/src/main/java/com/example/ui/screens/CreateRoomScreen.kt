@@ -11,6 +11,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -529,17 +531,35 @@ fun CreateRoomScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            OutlinedButton(
-                onClick = onBack,
+            // Cancel Button with Liquid Capsule & Subtle Water Shadow
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp),
-                shape = RoundedCornerShape(24.dp),
-                border = BorderStroke(1.dp, DarkCardBorder)
+                    .height(48.dp)
+                    .shadow(
+                        elevation = 6.dp,
+                        shape = RoundedCornerShape(24.dp),
+                        ambientColor = Color.Black.copy(alpha = 0.4f),
+                        spotColor = Color.Black
+                    )
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Color(0x99101424))
+                    .border(
+                        1.2.dp,
+                        Brush.verticalGradient(
+                            listOf(Color(0x55FFFFFF), DarkCardBorder, Color(0x10000000))
+                        ),
+                        RoundedCornerShape(24.dp)
+                    )
+                    .clickable(onClick = onBack),
+                contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = "CANCEL",
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp
+                    ),
                     color = TextSecondary
                 )
             }
