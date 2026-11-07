@@ -68,6 +68,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        try {
+            com.google.firebase.FirebaseApp.initializeApp(this)
+        } catch (_: Exception) {}
 
         soundEffects = GameSoundEffects(applicationContext)
         gameEngine = ShadowHuntEngine(soundEffects)
@@ -245,14 +248,7 @@ fun ShadowHuntApp(
                     profile = userProfile,
                     onPlayNow = {
                         soundEffects.playClick()
-                        // Request GPS and Camera for live outdoor game
-                        permissionLauncher.launch(
-                            arrayOf(
-                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                Manifest.permission.ACCESS_COARSE_LOCATION,
-                                Manifest.permission.CAMERA
-                            )
-                        )
+                        currentScreen = Screen.CreateRoom
                     },
                     onCreateRoom = {
                         soundEffects.playClick()
@@ -597,15 +593,7 @@ fun ShadowHuntApp(
                     soundEffects.playClick()
                     when (tab) {
                         NavigationTab.HOME -> currentScreen = Screen.Home
-                        NavigationTab.PLAY -> {
-                            permissionLauncher.launch(
-                                arrayOf(
-                                    Manifest.permission.ACCESS_FINE_LOCATION,
-                                    Manifest.permission.ACCESS_COARSE_LOCATION,
-                                    Manifest.permission.CAMERA
-                                )
-                            )
-                        }
+                        NavigationTab.PLAY -> currentScreen = Screen.CreateRoom
                         NavigationTab.FRIENDS -> currentScreen = Screen.Friends
                         NavigationTab.PROFILE -> currentScreen = Screen.Profile
                         NavigationTab.LAST_WALL -> currentScreen = Screen.LastWall

@@ -31,6 +31,9 @@ class LiveLocationManager(private val context: Context) {
         }
     }
 
+    private var sysLocationManager: android.location.LocationManager? = null
+    private var sysGpsListener: android.location.LocationListener? = null
+
     @SuppressLint("MissingPermission")
     fun startLocationUpdates() {
         stopLocationUpdates()
@@ -49,20 +52,34 @@ class LiveLocationManager(private val context: Context) {
                     }
                 }
 
-            val sysLocManager = context.getSystemService(Context.LOCATION_SERVICE) as? android.location.LocationManager
-            if (sysLocManager != null) {
-                val gpsLoc = sysLocManager.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER)
-                val netLoc = sysLocManager.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER)
+            sysLocationManager = context.getSystemService(Context.LOCATION_SERVICE) as? android.location.LocationManager
+            if (sysLocationManager != null) {
+                val gpsLoc = sysLocationManager?.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER)
+                val netLoc = sysLocationManager?.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER)
                 val best = gpsLoc ?: netLoc
                 if (best != null && _currentLocation.value == null) {
                     _currentLocation.value = best
                 }
+
+                // Direct hardware GPS listener for zero-lag satellite telemetry
+                sysGpsListener = android.location.LocationListener { loc ->
+                    _currentLocation.value = loc
+                }
+                try {
+                    sysLocationManager?.requestLocationUpdates(
+                        android.location.LocationManager.GPS_PROVIDER,
+                        1000L,
+                        0.0f,
+                        sysGpsListener!!,
+                        Looper.getMainLooper()
+                    )
+                } catch (_: Exception) {}
             }
         } catch (_: Exception) {}
 
-        val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1500L)
-            .setMinUpdateIntervalMillis(800L)
-            .setMinUpdateDistanceMeters(1.0f)
+        val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000L)
+            .setMinUpdateIntervalMillis(500L)
+            .setMinUpdateDistanceMeters(0.0f)
             .build()
 
         locationCallback = object : LocationCallback() {
@@ -86,6 +103,10 @@ class LiveLocationManager(private val context: Context) {
         locationCallback?.let {
             fusedLocationClient.removeLocationUpdates(it)
             locationCallback = null
+        }
+        sysGpsListener?.let {
+            sysLocationManager?.removeUpdates(it)
+            sysGpsListener = null
         }
     }
 

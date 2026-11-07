@@ -75,3 +75,18 @@ val TextMuted = Color(0xFF6B768E)
 
 val DangerZoneRed = Color(0x55FF1744)
 val SafeZoneCyan = Color(0x4400E5FF)
+
+// Apple iOS 18 & VisionOS Liquid Glass Tokens
+val AppleDeepObsidian = Color(0xFF060812)
+val AppleGlassSurface = Color(0xD0121727)
+val AppleGlassFrosted = Color(0xA6111728)
+val AppleGlassHighlight = Color(0x55FFFFFF)
+val AppleGlassBorderLight = Color(0x66FFFFFF)
+val AppleGlassBorderSubtle = Color(0x20FFFFFF)
+val AppleElectricIndigo = Color(0xFF5E5CE6)
+val AppleVibrantPink = Color(0xFFFF2D55)
+val AppleVibrantCyan = Color(0xFF64D2FF)
+val AppleVibrantEmerald = Color(0xFF30D158)
+val AppleVibrantAmber = Color(0xFFFFD60A)
+val WaterShadowAppleGlass = Color(0x665E5CE6)
+

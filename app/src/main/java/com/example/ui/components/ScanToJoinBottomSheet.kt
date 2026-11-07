@@ -35,12 +35,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.*
 
+import android.graphics.Bitmap
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.EncodeHintType
+import com.google.zxing.qrcode.QRCodeWriter
+import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
+
 /**
  * "SCAN TO JOIN" Modal Bottom Sheet matching IMG_20261106_143312_ffe9b7eb.jpg
  * Features:
  *  - Header with close '✕' button
  *  - Explanatory subtitle
- *  - QR Code with Neon Lime corner scanner brackets
+ *  - Real scannable QR Code with ZXing encoder
+ *  - Neon Lime corner scanner brackets
  *  - Prominent Neon Lime GAME CODE
  *  - Share button
  */
@@ -51,6 +60,32 @@ fun ScanToJoinBottomSheet(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val inviteUrl = remember(roomCode) { "https://mugshot.shadowhunt.app/join/$roomCode" }
+
+    val qrImageBitmap = remember(roomCode) {
+        try {
+            val hints = mapOf(
+                EncodeHintType.MARGIN to 1,
+                EncodeHintType.CHARACTER_SET to "UTF-8",
+                EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M
+            )
+            val bitMatrix = QRCodeWriter().encode(inviteUrl, BarcodeFormat.QR_CODE, 512, 512, hints)
+            val width = bitMatrix.width
+            val height = bitMatrix.height
+            val pixels = IntArray(width * height)
+            for (y in 0 until height) {
+                val offset = y * width
+                for (x in 0 until width) {
+                    pixels[offset + x] = if (bitMatrix.get(x, y)) android.graphics.Color.BLACK else android.graphics.Color.WHITE
+                }
+            }
+            val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            bmp.setPixels(pixels, 0, width, 0, 0, width, height)
+            bmp.asImageBitmap()
+        } catch (_: Exception) {
+            null
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -119,10 +154,9 @@ fun ScanToJoinBottomSheet(
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            // Centered QR Code with Vibrant Neon Lime Scanner Brackets
+            // Centered Real Scannable QR Code with Vibrant Neon Lime Scanner Brackets
             Box(
-                modifier = Modifier
-                    .size(260.dp),
+                modifier = Modifier.size(260.dp),
                 contentAlignment = Alignment.Center
             ) {
                 // QR White Surface
@@ -134,63 +168,14 @@ fun ScanToJoinBottomSheet(
                         .padding(14.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    // Procedural high-contrast QR Matrix representation based on roomCode
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        val matrixSize = 25
-                        val cellSize = size.width / matrixSize
-
-                        // Draw corner finder patterns (top-left, top-right, bottom-left)
-                        fun drawFinder(cx: Float, cy: Float) {
-                            drawRoundRect(
-                                color = Color.Black,
-                                topLeft = Offset(cx, cy),
-                                size = Size(cellSize * 7, cellSize * 7),
-                                cornerRadius = CornerRadius(cellSize * 1.5f, cellSize * 1.5f)
-                            )
-                            drawRoundRect(
-                                color = Color.White,
-                                topLeft = Offset(cx + cellSize, cy + cellSize),
-                                size = Size(cellSize * 5, cellSize * 5),
-                                cornerRadius = CornerRadius(cellSize, cellSize)
-                            )
-                            drawRoundRect(
-                                color = Color.Black,
-                                topLeft = Offset(cx + cellSize * 2, cy + cellSize * 2),
-                                size = Size(cellSize * 3, cellSize * 3),
-                                cornerRadius = CornerRadius(cellSize * 0.8f, cellSize * 0.8f)
-                            )
-                        }
-
-                        drawFinder(0f, 0f)
-                        drawFinder(size.width - cellSize * 7, 0f)
-                        drawFinder(0f, size.height - cellSize * 7)
-
-                        // Data modules seeded by roomCode hash
-                        val seed = roomCode.hashCode()
-                        val random = java.util.Random(seed.toLong())
-
-                        for (r in 0 until matrixSize) {
-                            for (c in 0 until matrixSize) {
-                                // Skip finder patterns
-                                val inTopLeft = r < 8 && c < 8
-                                val inTopRight = r < 8 && c >= matrixSize - 8
-                                val inBottomLeft = r >= matrixSize - 8 && c < 8
-
-                                if (!inTopLeft && !inTopRight && !inBottomLeft) {
-                                    val isBlack = (r % 2 == 0 && c % 2 == 1) ||
-                                            (random.nextFloat() > 0.45f) ||
-                                            ((r + c) % 3 == 0)
-
-                                    if (isBlack) {
-                                        drawRect(
-                                            color = Color.Black,
-                                            topLeft = Offset(c * cellSize, r * cellSize),
-                                            size = Size(cellSize, cellSize)
-                                        )
-                                    }
-                                }
-                            }
-                        }
+                    if (qrImageBitmap != null) {
+                        Image(
+                            bitmap = qrImageBitmap,
+                            contentDescription = "Real scannable QR Code for game invite",
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        CircularProgressIndicator(color = MugshotNeonLime)
                     }
                 }
 

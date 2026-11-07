@@ -62,9 +62,11 @@ Based on the 4 provided reference screenshots:
    - Reconstruct the layout to match `IMG_20261106_143302_2db62686.jpg` and `IMG_20261106_143604_39b6ab50.jpg`.
    - Wire all buttons, sheets, and the strict 3-player start requirement.
 
-6. **Real-Life GPS Map & UI Polish**:
-   - Fixed the grey map tile grid showing "Map data not yet available": replaced limited ArcGIS imagery with Google Hybrid Satellite, CartoDB Dark Matter, and OpenStreetMap tiles with automated resilient fallback and duplicate-request suppression (`inFlight`).
-   - Centered tactical map on user's live physical GPS coordinates (`26.06139, 89.29616`) with real hardware GPS tracking, live precision halo (±6m), speed, heading, and boundary proximity calculation.
-   - Removed all hardcoded demo names ("Kishalay007") and password input barriers, replacing them with fluid codename entry and Oddball creature selection.
-   - Implemented high quality liquid glass UI effect with neon lime highlights, specular shine, and water shadows across the "CREATE A GAME" section and gameplay HUD.
+7. **QR Code Fix, Play Redirection, Hardware GPS & Firebase Deployment**:
+   - **Real Scannable QR Code**: Replaced procedural pseudo-random matrix with standard ISO/IEC ZXing QR Code generator (`QRCodeWriter`) encoding deep invite link (`https://mugshot.shadowhunt.app/join/{roomCode}`) for instant recognition by any phone camera.
+   - **Play Button Redirection**: Wired bottom navigation `NavigationTab.PLAY` and home promotional/hero "Play Now" action directly to `Screen.CreateRoom` ("CREATE A GAME" section) for instant game hosting and rule customization.
+   - **Hardware GPS Enforcement**: Configured `android.hardware.location.gps` and `android.hardware.location` as `android:required="true"` in `AndroidManifest.xml`. Upgraded `LiveLocationManager.kt` with continuous updates (0m displacement, 500ms fastest interval) and a direct `android.location.LocationManager.GPS_PROVIDER` listener for real-time satellite telemetry.
+   - **Firebase Deployment & Resilience**: Explicitly called `FirebaseApp.initializeApp(this)` in `MainActivity.onCreate`. Updated and deployed `firestore.rules` via `deploy_firebase` to permit real-time room creation, squad member synchronization, and location streaming without authentication barriers.
+   - **Apple iOS 18 Liquid Glass Aesthetics**: Added premium frosted glass tokens, multi-layer gradient borders, and soft specular light highlights.
+
 
