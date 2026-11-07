@@ -343,16 +343,146 @@ fun HomeScreen(
                 }
             }
 
-            // BUTTON 2: CREATE A GAME >> (Liquid Glass Capsule Button with Water Shadow)
-            LiquidGlassButton(
-                text = "CREATE A GAME",
-                onClick = onCreateRoom,
-                icon = Icons.Default.SportsEsports,
-                trailingText = ">>",
-                gradientColors = listOf(LiquidCrimsonCoral, LiquidCrimsonOrange),
-                waterShadowColor = WaterShadowCrimson,
-                height = 64.dp
-            )
+            // SECTION: CREATE A GAME - High Quality Liquid Glass Capsule Card with Water Shadow
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .shadow(
+                        elevation = 18.dp,
+                        shape = RoundedCornerShape(26.dp),
+                        ambientColor = WaterShadowLime,
+                        spotColor = MugshotNeonLime
+                    )
+                    .clip(RoundedCornerShape(26.dp))
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0xE6141D2C),
+                                Color(0xF20A0E18)
+                            )
+                        )
+                    )
+                    .border(
+                        width = 1.8.dp,
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0xAAFFFFFF),
+                                MugshotNeonLime.copy(alpha = 0.7f),
+                                Color(0x22000000)
+                            )
+                        ),
+                        shape = RoundedCornerShape(26.dp)
+                    )
+                    .padding(20.dp)
+            ) {
+                Column {
+                    // Header row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(46.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF22301A)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.SportsEsports,
+                                    contentDescription = null,
+                                    tint = MugshotNeonLime,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "CREATE A GAME",
+                                    style = MaterialTheme.typography.titleLarge.copy(
+                                        fontWeight = FontWeight.Black,
+                                        letterSpacing = 0.5.sp
+                                    ),
+                                    color = Color.White
+                                )
+                                Text(
+                                    text = "Host outdoor GPS hunt with friends",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color(0xFFA0ABBE)
+                                )
+                            }
+                        }
+
+                        // Host pill badge
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFF24351C))
+                                .border(1.dp, MugshotNeonLime.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = "HOST",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Black,
+                                    letterSpacing = 1.sp
+                                ),
+                                color = MugshotNeonLime
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Preset chips preview
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf("⚡ Intense (12m)", "🎯 Standard (20m)", "🌲 Chill (30m)").forEach { chip ->
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Color(0xFF192233))
+                                    .border(1.dp, Color(0xFF2E3D56), RoundedCornerShape(10.dp))
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = chip,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                                    color = Color.White
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = "🔒 Requires min 3 real human players · 100% real GPS outdoor arena",
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                        color = Color(0xFF8A9AAF)
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Create Action Button
+                    LiquidGlassButton(
+                        text = "CREATE GAME LOBBY",
+                        onClick = onCreateRoom,
+                        icon = Icons.Default.AddCircleOutline,
+                        trailingText = ">>",
+                        gradientColors = listOf(MugshotNeonLime, MugshotNeonLimeDark),
+                        textColor = Color.Black,
+                        waterShadowColor = WaterShadowLime,
+                        height = 56.dp
+                    )
+                }
+            }
 
             // BUTTON 3: JOIN WITH CODE >> (Liquid Glass Capsule Button with Water Shadow)
             LiquidGlassButton(
@@ -362,7 +492,7 @@ fun HomeScreen(
                 trailingText = ">>",
                 gradientColors = listOf(RoyalCyberIris, NeonOrchidPink),
                 waterShadowColor = WaterShadowPurple,
-                height = 64.dp
+                height = 60.dp
             )
 
             // CARD 4: GLOBAL CHAT LIVE - Liquid Glass Capsule Card with Water Shadow

@@ -14,7 +14,8 @@ data class RealGpsPlayer(
     var taggedAtSeconds: Int = 0,
     var isLocalPlayer: Boolean = false,
     var capturedPhotoPath: String? = null,
-    var lastBlinkVisible: Boolean = false
+    var lastBlinkVisible: Boolean = false,
+    var healthHp: Int = 100
 )
 
 data class RealGpsSafeZone(

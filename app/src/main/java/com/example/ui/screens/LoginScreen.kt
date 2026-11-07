@@ -1,95 +1,71 @@
 package com.example.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInVertically
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.*
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.Visibility
-import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.R
-import com.example.ui.components.GlassPanel
 import com.example.ui.components.LiquidGlassButton
-import com.example.ui.components.NeonGamingButton
+import com.example.ui.components.OddballAvatar
 import com.example.ui.theme.*
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Clean Hunter Entry screen without password obstacles or demo accounts.
+ */
 @Composable
 fun LoginScreen(
     onLoginSuccess: (username: String) -> Unit,
     onGuestLogin: () -> Unit
 ) {
-    var username by remember { mutableStateOf("Kishalay_007") }
-    var password by remember { mutableStateOf("••••••••") }
-    var passwordVisible by remember { mutableStateOf(false) }
-    var rememberMe by remember { mutableStateOf(true) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var username by remember { mutableStateOf("") }
+    var selectedAvatarId by remember { mutableStateOf("krish") }
 
     val focusManager = LocalFocusManager.current
     val scrollState = rememberScrollState()
 
     fun attemptLogin() {
-        if (username.trim().isEmpty()) {
-            errorMessage = "Please enter your Hunter Codename"
-            return
-        }
-        if (password.trim().isEmpty()) {
-            errorMessage = "Please enter your Hunter Key"
-            return
-        }
-        errorMessage = null
-        onLoginSuccess(username.trim())
+        val chosenName = username.trim().ifEmpty { "Hunter" }
+        onLoginSuccess(chosenName)
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(DarkBackground)
+            .background(MugshotDarkBg)
     ) {
-        // Ambient background glow
+        // Ambient Liquid Background Glow
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            NeonPurple.copy(alpha = 0.15f),
-                            NeonRed.copy(alpha = 0.08f),
-                            DarkBackground
+                            MugshotNeonLime.copy(alpha = 0.08f),
+                            WaterShadowCyan.copy(alpha = 0.05f),
+                            MugshotDarkBg
                         ),
-                        radius = 1200f
+                        radius = 1100f
                     )
                 )
         )
@@ -99,182 +75,150 @@ fun LoginScreen(
                 .fillMaxSize()
                 .verticalScroll(scrollState)
                 .padding(horizontal = 24.dp)
-                .padding(top = 40.dp, bottom = 32.dp),
+                .statusBarsPadding()
+                .padding(top = 28.dp, bottom = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Header Image / Badge
+            // Oddball Hero Avatar with Water Shadow
             Box(
                 modifier = Modifier
-                    .size(90.dp)
-                    .clip(CircleShape)
-                    .background(DarkSurfaceVariant)
-                    .border(2.dp, NeonRed, CircleShape),
+                    .size(100.dp)
+                    .shadow(
+                        elevation = 20.dp,
+                        shape = RoundedCornerShape(28.dp),
+                        ambientColor = WaterShadowLime,
+                        spotColor = MugshotNeonLime
+                    )
+                    .clip(RoundedCornerShape(28.dp))
+                    .border(2.dp, MugshotNeonLime, RoundedCornerShape(28.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.avatar_hunter),
-                    contentDescription = "Hunter Emblem",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
+                OddballAvatar(avatarId = selectedAvatarId, size = 100.dp)
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-            // Brand Title
+            // Game Brand Title
             Text(
-                text = "SHADOW HUNT",
+                text = "LAST SEEN MUGSHOT",
                 style = MaterialTheme.typography.headlineMedium.copy(
                     fontWeight = FontWeight.Black,
-                    letterSpacing = 2.sp
+                    letterSpacing = 1.sp
                 ),
-                color = NeonRed
+                color = Color.White
             )
+
             Text(
-                text = "AUTHENTICATION TERMINAL",
+                text = "REAL OUTDOOR GPS SQUAD HUNT",
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.Bold,
-                    letterSpacing = 3.sp
+                    letterSpacing = 2.sp
                 ),
-                color = ElectricBlue
+                color = MugshotNeonLime
             )
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            // Login Glass Form Card
-            GlassPanel(
-                modifier = Modifier.fillMaxWidth(),
-                borderColor = DarkCardBorder,
-                shape = RoundedCornerShape(24.dp)
+            // Choose Your Oddball Creature Row
+            Text(
+                text = "CHOOSE YOUR CREATURE",
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                ),
+                color = Color(0xFFA0ABBE)
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(24.dp)
-                ) {
+                listOf(
+                    "krish" to "Cyclops",
+                    "john" to "Turnip",
+                    "star" to "Spiky"
+                ).forEach { (id, label) ->
+                    val isSelected = selectedAvatarId == id
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(if (isSelected) Color(0xFF1E2838) else Color(0xFF131826))
+                            .border(
+                                width = if (isSelected) 2.dp else 1.dp,
+                                color = if (isSelected) MugshotNeonLime else Color(0xFF263248),
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                            .clickable { selectedAvatarId = id }
+                            .padding(10.dp)
+                    ) {
+                        OddballAvatar(avatarId = id, size = 52.dp)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            ),
+                            color = if (isSelected) MugshotNeonLime else Color.White
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Liquid Glass Capsule Card for Player Name Input
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .shadow(
+                        elevation = 16.dp,
+                        shape = RoundedCornerShape(24.dp),
+                        ambientColor = Color.Black.copy(alpha = 0.6f)
+                    )
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(MugshotCardBg)
+                    .border(
+                        1.5.dp,
+                        Brush.verticalGradient(
+                            listOf(Color(0x88FFFFFF), MugshotCardBorder, Color(0x10000000))
+                        ),
+                        RoundedCornerShape(24.dp)
+                    )
+                    .padding(22.dp)
+            ) {
+                Column(horizontalAlignment = Alignment.Start) {
                     Text(
-                        text = "SIGN IN TO YOUR HUNT",
-                        style = MaterialTheme.typography.titleMedium.copy(
+                        text = "HUNTER CODENAME",
+                        style = MaterialTheme.typography.labelMedium.copy(
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.sp
                         ),
-                        color = Color.White
-                    )
-                    Text(
-                        text = "Synchronize stats, multiplayer rooms, and mugshots",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary,
-                        modifier = Modifier.padding(top = 2.dp, bottom = 20.dp)
+                        color = Color(0xFFA0ABBE)
                     )
 
-                    // Error Banner
-                    AnimatedVisibility(visible = errorMessage != null) {
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 16.dp),
-                            color = NeonRed.copy(alpha = 0.15f),
-                            shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, NeonRed.copy(alpha = 0.5f))
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Warning,
-                                    contentDescription = null,
-                                    tint = NeonRed,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = errorMessage ?: "",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = Color.White
-                                )
-                            }
-                        }
-                    }
+                    Spacer(modifier = Modifier.height(10.dp))
 
-                    // Username Input Field
-                    Text(
-                        text = "CODENAME / USERNAME",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = TextSecondary
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
                     OutlinedTextField(
                         value = username,
-                        onValueChange = {
-                            username = it
-                            errorMessage = null
-                        },
+                        onValueChange = { username = it },
                         modifier = Modifier.fillMaxWidth(),
                         leadingIcon = {
                             Icon(
-                                imageVector = Icons.Outlined.Person,
+                                imageVector = Icons.Default.Person,
                                 contentDescription = null,
-                                tint = ElectricBlue
+                                tint = MugshotNeonLime
                             )
                         },
                         placeholder = {
-                            Text("e.g. Kishalay_007", color = TextMuted)
+                            Text("Enter your codename (e.g. Hunter)", color = Color(0xFF6E7E95))
                         },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Text,
-                            imeAction = ImeAction.Next
-                        ),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = ElectricBlue,
-                            unfocusedBorderColor = DarkCardBorder,
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            cursorColor = ElectricBlue
-                        ),
-                        shape = RoundedCornerShape(14.dp)
-                    )
-
-                    Spacer(modifier = Modifier.height(18.dp))
-
-                    // Password Input Field
-                    Text(
-                        text = "PASSWORD / HUNTER KEY",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = TextSecondary
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    OutlinedTextField(
-                        value = password,
-                        onValueChange = {
-                            password = it
-                            errorMessage = null
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Outlined.Lock,
-                                contentDescription = null,
-                                tint = NeonPurple
-                            )
-                        },
-                        trailingIcon = {
-                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                Icon(
-                                    imageVector = if (passwordVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                                    contentDescription = if (passwordVisible) "Hide password" else "Show password",
-                                    tint = TextSecondary
-                                )
-                            }
-                        },
-                        placeholder = {
-                            Text("Enter password", color = TextMuted)
-                        },
-                        singleLine = true,
-                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Password,
                             imeAction = ImeAction.Done
                         ),
                         keyboardActions = KeyboardActions(onDone = {
@@ -282,104 +226,56 @@ fun LoginScreen(
                             attemptLogin()
                         }),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = NeonPurple,
-                            unfocusedBorderColor = DarkCardBorder,
+                            focusedContainerColor = Color(0xFF0F1522),
+                            unfocusedContainerColor = Color(0xFF0F1522),
+                            focusedBorderColor = MugshotNeonLime,
+                            unfocusedBorderColor = Color(0xFF2B374E),
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White,
-                            cursorColor = NeonPurple
+                            cursorColor = MugshotNeonLime
                         ),
-                        shape = RoundedCornerShape(14.dp)
+                        shape = RoundedCornerShape(16.dp)
                     )
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                    // Remember Me & Forgot Password
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.clickable { rememberMe = !rememberMe }
-                        ) {
-                            Checkbox(
-                                checked = rememberMe,
-                                onCheckedChange = { rememberMe = it },
-                                colors = CheckboxDefaults.colors(
-                                    checkedColor = NeonRed,
-                                    uncheckedColor = TextSecondary,
-                                    checkmarkColor = Color.White
-                                )
-                            )
-                            Text(
-                                text = "Remember Hunter ID",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color.White
-                            )
-                        }
-
-                        Text(
-                            text = "Reset Key",
-                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
-                            color = ElectricBlue,
-                            modifier = Modifier.clickable { /* hint */ }
-                        )
-                    }
+                    Text(
+                        text = "🔒 No passwords required. Your codename and real GPS coordinates will sync with your friends in the live match.",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontSize = 11.sp,
+                            lineHeight = 16.sp
+                        ),
+                        color = Color(0xFF7A8A9E)
+                    )
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Sign In Action Button
-                    NeonGamingButton(
-                        text = "LOGIN & ENTER THE HUNT",
-                        onClick = {
-                            focusManager.clearFocus()
-                            attemptLogin()
-                        },
-                        icon = Icons.Default.Login,
-                        gradientColors = listOf(Color(0xFFFF1E43), Color(0xFFD50000)),
-                        borderColor = Color(0xFFFF5252),
-                        height = 56.dp
+                    // Primary Button: START PLAYING
+                    LiquidGlassButton(
+                        text = "START PLAYING",
+                        onClick = { attemptLogin() },
+                        icon = Icons.Default.ArrowForward,
+                        trailingText = ">>",
+                        gradientColors = listOf(MugshotNeonLime, MugshotNeonLimeDark),
+                        textColor = Color.Black,
+                        waterShadowColor = WaterShadowLime,
+                        height = 58.dp
                     )
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Guest Login Option with Liquid Glass Capsule & Water Shadow
+                    // Secondary Button: QUICK GUEST ACCESS
                     LiquidGlassButton(
                         text = "QUICK GUEST ACCESS",
                         onClick = onGuestLogin,
-                        icon = Icons.Default.DirectionsRun,
-                        trailingText = ">>",
-                        gradientColors = listOf(LiquidAuroraCyan, LiquidSapphireBlue),
-                        waterShadowColor = WaterShadowAqua,
-                        height = 50.dp
+                        icon = Icons.Default.FlashOn,
+                        trailingText = null,
+                        gradientColors = listOf(Color(0xFF1E2838), Color(0xFF131A26)),
+                        textColor = Color.White,
+                        waterShadowColor = Color.Transparent,
+                        height = 52.dp
                     )
                 }
-            }
-
-            Spacer(modifier = Modifier.height(28.dp))
-
-            // Security statement
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Shield,
-                    contentDescription = null,
-                    tint = NeonGreen,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "Encrypted Connection • Zero Personal Info Shared",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TextSecondary,
-                    textAlign = TextAlign.Center
-                )
             }
         }
     }

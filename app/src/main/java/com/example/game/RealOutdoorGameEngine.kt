@@ -58,6 +58,24 @@ class RealOutdoorGameEngine(
     private val _radarRevealSecondsLeft = MutableStateFlow(0)
     val radarRevealSecondsLeft: StateFlow<Int> = _radarRevealSecondsLeft.asStateFlow()
 
+    private val _localHealthHp = MutableStateFlow(92)
+    val localHealthHp: StateFlow<Int> = _localHealthHp.asStateFlow()
+
+    private val _headStartSecondsLeft = MutableStateFlow(30)
+    val headStartSecondsLeft: StateFlow<Int> = _headStartSecondsLeft.asStateFlow()
+
+    private val _isHeadStartActive = MutableStateFlow(true)
+    val isHeadStartActive: StateFlow<Boolean> = _isHeadStartActive.asStateFlow()
+
+    private val _gameFeedMessages = MutableStateFlow<List<String>>(
+        listOf("John is the seeker. Runners have 30 s head start - run!")
+    )
+    val gameFeedMessages: StateFlow<List<String>> = _gameFeedMessages.asStateFlow()
+
+    fun addGameFeedMessage(msg: String) {
+        _gameFeedMessages.value = _gameFeedMessages.value + msg
+    }
+
     var roomSettings = LiveRoomSettings()
     private var engineScope: CoroutineScope? = null
     private var isRunning = false
@@ -86,7 +104,7 @@ class RealOutdoorGameEngine(
         list.add(
             RealGpsPlayer(
                 id = "p_local",
-                nickname = localNickname.ifEmpty { "Kishalay_007" },
+                nickname = localNickname.ifEmpty { "Hunter" },
                 avatarId = localAvatarId,
                 role = preferredRole,
                 latitude = lat,
@@ -290,6 +308,14 @@ class RealOutdoorGameEngine(
                     break
                 }
 
+                if (_headStartSecondsLeft.value > 0) {
+                    _headStartSecondsLeft.value -= 1
+                    if (_headStartSecondsLeft.value == 0) {
+                        _isHeadStartActive.value = false
+                        postAlert("HEAD START OVER! Hunt begins!")
+                    }
+                }
+
                 updateSafeZoneClock()
             }
         }
@@ -442,11 +468,23 @@ class RealOutdoorGameEngine(
             zone.centerLatitude, zone.centerLongitude
         )
         if (distToCenter > zone.currentRadiusMeters) {
-            if (Random.nextFloat() < 0.15f) {
+            if (local.role == PlayerRole.RUNNER) {
+                _localHealthHp.value = (_localHealthHp.value - 1).coerceAtLeast(0)
+                if (_localHealthHp.value <= 0) {
+                    local.role = PlayerRole.SEEKER
+                    postAlert("0 HP! You are out of health and became a Seeker!")
+                    soundEffects.playTargetLockedHaptic()
+                }
+            }
+            if (Random.nextFloat() < 0.12f) {
                 val outDist = (distToCenter - zone.currentRadiusMeters).toInt()
                 val formattedDist = if (outDist >= 1000) "%.1fkm".format(outDist / 1000f) else "${outDist}m"
-                postAlert("DANGER: OUT OF SAFE ZONE by $formattedDist!")
+                postAlert("DANGER: OUT OF SAFE ZONE by $formattedDist! Losing Health!")
                 soundEffects.playZoneWarning()
+            }
+        } else {
+            if (local.role == PlayerRole.RUNNER && _localHealthHp.value < 100) {
+                _localHealthHp.value = (_localHealthHp.value + 1).coerceAtMost(100)
             }
         }
 
@@ -560,6 +598,44 @@ class RealOutdoorGameEngine(
             firestoreRepo.publishBustedCard(roomSettings.roomCode, card)
 
             checkWinCondition()
+        }
+    }
+
+    fun triggerCatch(targetPlayer: RealGpsPlayer? = null) {
+        val currentList = _players.value.toMutableList()
+        val candidate = targetPlayer ?: _nearbyTarget.value ?: currentList.filter { it.role == PlayerRole.RUNNER && !it.isTagged }
+            .minByOrNull {
+                val local = currentList.find { p -> p.isLocalPlayer } ?: return@minByOrNull 9999f
+                LiveLocationManager.distanceMeters(local.latitude, local.longitude, it.latitude, it.longitude)
+            }
+
+        if (candidate != null) {
+            val runnerIndex = currentList.indexOfFirst { it.id == candidate.id }
+            if (runnerIndex != -1) {
+                val capturedRunner = currentList[runnerIndex]
+                val local = currentList.find { it.isLocalPlayer }
+                val dist = if (local != null) {
+                    LiveLocationManager.distanceMeters(local.latitude, local.longitude, capturedRunner.latitude, capturedRunner.longitude)
+                } else 10f
+
+                if (dist <= 30f) {
+                    soundEffects.playTagCapture()
+                    currentList[runnerIndex] = capturedRunner.copy(
+                        isTagged = true,
+                        role = PlayerRole.SEEKER,
+                        taggedAtSeconds = roomSettings.durationMinutes * 60 - _remainingSeconds.value
+                    )
+                    _players.value = currentList
+                    _nearbyTarget.value = null
+                    postAlert("🎯 CAUGHT! ${capturedRunner.nickname} was tagged (${dist.toInt()}m) and joined the seekers!")
+                    soundEffects.playTargetLockedHaptic()
+                    checkWinCondition()
+                } else {
+                    postAlert("Too far to catch! Runner is ${dist.toInt()}m away (get within 30m)")
+                }
+            }
+        } else {
+            postAlert("No runners within catch range.")
         }
     }
 

@@ -45,18 +45,51 @@ import java.util.concurrent.TimeUnit
 import kotlin.math.*
 
 enum class MapLayerType(val displayName: String, val shortName: String) {
-    TACTICAL_NEON("NEON TACTICAL", "TACTICAL"),
+    SATELLITE("SATELLITE HYBRID", "SATELLITE"),
+    TACTICAL_NEON("DARK TACTICAL", "TACTICAL"),
     STREET("OPENSTREETMAP", "STREET"),
-    SATELLITE("SATELLITE", "SATELLITE"),
     TERRAIN("TERRAIN", "TERRAIN")
 }
 
 object MapTileCache {
     val cache = ConcurrentHashMap<String, ImageBitmap>()
+    val inFlight = ConcurrentHashMap<String, Boolean>()
     val httpClient = OkHttpClient.Builder()
-        .connectTimeout(6, TimeUnit.SECONDS)
-        .readTimeout(8, TimeUnit.SECONDS)
+        .connectTimeout(5, TimeUnit.SECONDS)
+        .readTimeout(7, TimeUnit.SECONDS)
         .build()
+}
+
+private fun getTileCandidateUrls(layer: MapLayerType, z: Int, x: Int, y: Int): List<String> {
+    val serverNum = (abs(x + y) % 4)
+    return when (layer) {
+        MapLayerType.SATELLITE -> listOf(
+            // 1. Google Hybrid Satellite (Photo + Roads + Labels) - 100% global coverage down to zoom 20
+            "https://mt$serverNum.google.com/vt/lyrs=y&x=$x&y=$y&z=$z",
+            // 2. Google Pure Satellite
+            "https://mt$serverNum.google.com/vt/lyrs=s&x=$x&y=$y&z=$z",
+            // 3. CartoDB Dark Matter fallback
+            "https://basemaps.cartocdn.com/dark_all/$z/$x/$y.png",
+            // 4. OpenStreetMap fallback
+            "https://tile.openstreetmap.org/$z/$x/$y.png"
+        )
+        MapLayerType.TACTICAL_NEON -> listOf(
+            // Dark Tactical Basemap from CartoDB (perfect dark tactical look)
+            "https://basemaps.cartocdn.com/dark_all/$z/$x/$y.png",
+            "https://tile.openstreetmap.org/$z/$x/$y.png",
+            "https://mt$serverNum.google.com/vt/lyrs=y&x=$x&y=$y&z=$z"
+        )
+        MapLayerType.STREET -> listOf(
+            "https://tile.openstreetmap.org/$z/$x/$y.png",
+            "https://basemaps.cartocdn.com/rastertiles/voyager/$z/$x/$y.png",
+            "https://mt$serverNum.google.com/vt/lyrs=m&x=$x&y=$y&z=$z"
+        )
+        MapLayerType.TERRAIN -> listOf(
+            "https://mt$serverNum.google.com/vt/lyrs=p&x=$x&y=$y&z=$z",
+            "https://basemaps.cartocdn.com/rastertiles/voyager/$z/$x/$y.png",
+            "https://tile.openstreetmap.org/$z/$x/$y.png"
+        )
+    }
 }
 
 @Composable
@@ -81,8 +114,8 @@ fun DarkTacticalMap(
     modifier: Modifier = Modifier
 ) {
     var selectedLayer by remember { mutableStateOf(MapLayerType.SATELLITE) }
-    // High-detail street-level zoom showing buildings, paths, alleys, and roads
-    var zoomLevel by remember { mutableFloatStateOf(17.8f) }
+    // High-clarity outdoor tactical zoom level showing houses, fields, alleys and streets
+    var zoomLevel by remember { mutableFloatStateOf(16.5f) }
     var panOffsetX by remember { mutableFloatStateOf(0f) }
     var panOffsetY by remember { mutableFloatStateOf(0f) }
 
@@ -106,7 +139,7 @@ fun DarkTacticalMap(
         if (recenterTrigger > 0) {
             panOffsetX = 0f
             panOffsetY = 0f
-            zoomLevel = 17.8f
+            zoomLevel = 16.5f
         }
     }
 
@@ -123,7 +156,7 @@ fun DarkTacticalMap(
             .background(Color(0xFF060A14))
             .pointerInput(Unit) {
                 detectTransformGestures { _, pan, zoom, _ ->
-                    zoomLevel = (zoomLevel * zoom).coerceIn(14.0f, 20.0f)
+                    zoomLevel = (zoomLevel * zoom).coerceIn(13.0f, 19.5f)
                     panOffsetX += pan.x
                     panOffsetY += pan.y
                 }
@@ -159,7 +192,7 @@ fun DarkTacticalMap(
             // Draw base dark tactical grid canvas background
             drawRect(color = Color(0xFF060A14))
 
-            // RASTER TILE DOWNLOAD & DRAW ENGINE (OSM / ESRI Satellite / ESRI Topo)
+            // RASTER TILE DOWNLOAD & DRAW ENGINE (Google Hybrid Satellite / CartoDB Dark / OSM)
             val z = zoomLevel.toInt().coerceIn(12, 19)
             val centerTileX = lonToTileX(viewCenterLon, z)
             val centerTileY = latToTileY(viewCenterLat, z)
@@ -203,34 +236,37 @@ fun DarkTacticalMap(
                             style = Stroke(1f)
                         )
 
-                        // Asynchronous tile fetch from free, zero-key endpoints
-                        coroutineScope.launch(Dispatchers.IO) {
-                            try {
-                                val url = when (selectedLayer) {
-                                    MapLayerType.TACTICAL_NEON, MapLayerType.STREET ->
-                                        "https://tile.openstreetmap.org/$z/$tileX/$tileY.png"
-                                    MapLayerType.SATELLITE ->
-                                        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/$z/$tileY/$tileX"
-                                    MapLayerType.TERRAIN ->
-                                        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/$z/$tileY/$tileX"
-                                }
+                        // Asynchronous tile fetch from high-resolution, global tile candidates
+                        if (MapTileCache.inFlight.putIfAbsent(tileKey, true) == null) {
+                            coroutineScope.launch(Dispatchers.IO) {
+                                try {
+                                    val candidateUrls = getTileCandidateUrls(selectedLayer, z, tileX, tileY)
+                                    for (candidateUrl in candidateUrls) {
+                                        try {
+                                            val req = Request.Builder()
+                                                .url(candidateUrl)
+                                                .header("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
+                                                .header("Referer", "https://maps.google.com/")
+                                                .build()
 
-                                val req = Request.Builder()
-                                    .url(url)
-                                    .header("User-Agent", "ShadowHuntGame/2.0 (Android; ZeroKeyTactical)")
-                                    .build()
-
-                                val resp = MapTileCache.httpClient.newCall(req).execute()
-                                if (resp.isSuccessful) {
-                                    val bytes = resp.body?.bytes()
-                                    if (bytes != null) {
-                                        val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                                        if (bmp != null) {
-                                            MapTileCache.cache[tileKey] = bmp.asImageBitmap()
-                                        }
+                                            val resp = MapTileCache.httpClient.newCall(req).execute()
+                                            if (resp.isSuccessful) {
+                                                val bytes = resp.body?.bytes()
+                                                // Ensure valid image size (> 1000 bytes) rather than error placeholder
+                                                if (bytes != null && bytes.size > 1000) {
+                                                    val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                                                    if (bmp != null) {
+                                                        MapTileCache.cache[tileKey] = bmp.asImageBitmap()
+                                                        break
+                                                    }
+                                                }
+                                            }
+                                        } catch (_: Exception) {}
                                     }
+                                } finally {
+                                    MapTileCache.inFlight.remove(tileKey)
                                 }
-                            } catch (_: Exception) {}
+                            }
                         }
                     }
                 }

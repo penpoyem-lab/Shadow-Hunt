@@ -38,7 +38,7 @@ object AvatarRegistry {
         AvatarOption("phantom", "Phantom Ninja", R.drawable.avatar_phantom, 0xFF9D00FF),
         AvatarOption("reaper", "Neon Reaper", R.drawable.avatar_reaper, 0xFF00E5FF),
         AvatarOption("demon", "Demon Warrior", R.drawable.avatar_demon, 0xFFFF3D00),
-        AvatarOption("kishalay", "Kishalay 007", R.drawable.avatar_anime_kishalay, 0xFF9D00FF)
+        AvatarOption("krish", "Oddball Hero", R.drawable.avatar_hunter, 0xFFC8FF00)
     )
 
     fun getAvatar(id: String): AvatarOption {
@@ -146,8 +146,8 @@ data class FriendItem(
 )
 
 data class UserProfileData(
-    val nickname: String = "Kishalay_007",
-    val avatarId: String = "kishalay",
+    val nickname: String = "Hunter",
+    val avatarId: String = "krish",
     val level: Int = 12,
     val currentXp: Int = 850,
     val maxXp: Int = 1200,

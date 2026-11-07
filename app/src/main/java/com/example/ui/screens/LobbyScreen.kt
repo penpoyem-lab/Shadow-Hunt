@@ -3,10 +3,14 @@ package com.example.ui.screens
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -19,17 +23,26 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.R
 import com.example.model.*
 import com.example.ui.components.*
 import com.example.ui.theme.*
 
+/**
+ * Last Seen Mugshot Lobby Screen matching IMG_20261106_143302_2db62686.jpg
+ * and IMG_20261106_143604_39b6ab50.jpg.
+ *
+ * Enforces:
+ *  - Strict 3-human player minimum to unlock the "START GAME ->" button
+ *  - Signature Neon Lime + dark slate aesthetic with liquid glass water shadows
+ *  - "Scan to Join" QR modal with lime corner brackets
+ *  - "Game Feel" settings bottom sheet
+ *  - Oddball avatars with host star badge
+ */
 @Composable
 fun LobbyScreen(
     roomConfig: RoomConfig,
@@ -40,491 +53,444 @@ fun LobbyScreen(
     onAddBot: () -> Unit
 ) {
     val context = LocalContext.current
-    var isStartingCountdown by remember { mutableStateOf(false) }
-    var countdownSec by remember { mutableIntStateOf(5) }
-    var showRoomQrDialog by remember { mutableStateOf(false) }
+    var liveConfig by remember { mutableStateOf(roomConfig) }
 
-    if (showRoomQrDialog) {
-        com.example.ui.components.RoomQrCodeDialog(
-            roomCode = roomConfig.code,
-            onDismiss = { showRoomQrDialog = false }
-        )
-    }
-
-    LaunchedEffect(isStartingCountdown) {
-        if (isStartingCountdown) {
-            while (countdownSec > 0) {
-                kotlinx.coroutines.delay(1000)
-                countdownSec--
-            }
-            onStartGame()
-        }
-    }
+    var showScanToJoinSheet by remember { mutableStateOf(false) }
+    var showGameFeelSheet by remember { mutableStateOf(false) }
+    var showOddballDialog by remember { mutableStateOf(false) }
+    var showAllPlayersDialog by remember { mutableStateOf(false) }
+    var showLastWallDialog by remember { mutableStateOf(false) }
 
     val localPlayer = players.find { it.isLocalPlayer } ?: players.firstOrNull()
     val isHost = localPlayer?.isHost ?: true
+    var localChosenAvatarId by remember { mutableStateOf(localPlayer?.avatarId ?: "krish") }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(DarkBackground)
-            .statusBarsPadding()
-            .verticalScroll(rememberScrollState())
-            .padding(bottom = 32.dp)
-    ) {
-        // TOP HEADER
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .shadow(
-                        elevation = 8.dp,
-                        shape = CircleShape,
-                        ambientColor = Color.Black.copy(alpha = 0.5f),
-                        spotColor = Color.Black
-                    )
-                    .clip(CircleShape)
-                    .background(Color(0xCC0D1222))
-                    .border(
-                        1.2.dp,
-                        Brush.verticalGradient(listOf(Color(0x66FFFFFF), DarkCardBorder)),
-                        CircleShape
-                    )
-                    .clickable(onClick = onLeaveLobby),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ArrowBack,
-                    contentDescription = "Leave",
-                    tint = Color.White,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
+    // Strict 3-real-human requirement as confirmed by the user
+    val requiredPlayers = 3
+    val playersCount = players.size
+    val neededPlayers = (requiredPlayers - playersCount).coerceAtLeast(0)
+    val isReadyToStart = playersCount >= requiredPlayers
 
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    // 1. SCAN TO JOIN BOTTOM SHEET
+    if (showScanToJoinSheet) {
+        ScanToJoinBottomSheet(
+            roomCode = liveConfig.code,
+            onDismiss = { showScanToJoinSheet = false }
+        )
+    }
+
+    // 2. GAME FEEL BOTTOM SHEET
+    if (showGameFeelSheet) {
+        GameFeelBottomSheet(
+            currentConfig = liveConfig,
+            onSaveConfig = { updated ->
+                liveConfig = updated
+            },
+            onDismiss = { showGameFeelSheet = false }
+        )
+    }
+
+    // 3. ODDBALL PICKER DIALOG
+    if (showOddballDialog) {
+        AlertDialog(
+            onDismissRequest = { showOddballDialog = false },
+            containerColor = Color(0xFF0F1524),
+            title = {
                 Text(
-                    text = "LOBBY",
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 1.sp
-                    ),
+                    text = "Pick Your Oddball",
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
                     color = Color.White
                 )
-                Text(
-                    text = roomConfig.name,
-                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp),
-                    color = TextSecondary
-                )
-            }
-
-            // Leave Button with Water Shadow & Liquid Glass Capsule
-            Box(
-                modifier = Modifier
-                    .shadow(
-                        elevation = 8.dp,
-                        shape = RoundedCornerShape(20.dp),
-                        ambientColor = WaterShadowCrimson.copy(alpha = 0.4f),
-                        spotColor = WaterShadowCrimson
-                    )
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(Color(0x33FF1744))
-                    .border(
-                        1.2.dp,
-                        Brush.verticalGradient(listOf(Color(0x88FFFFFF), LiquidCrimsonCoral)),
-                        RoundedCornerShape(20.dp)
-                    )
-                    .clickable(onClick = onLeaveLobby)
-                    .padding(horizontal = 14.dp, vertical = 7.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.ExitToApp,
-                        contentDescription = null,
-                        tint = LiquidCrimsonCoral,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Text(
-                        text = "Leave",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black),
+                        text = "Choose your custom creature avatar for this match:",
+                        color = Color(0xFFA0ABBE)
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        listOf("krish" to "Cyclops Pin", "john" to "Turnip Drop", "star" to "Spiky Star").forEach { (id, name) ->
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .clickable {
+                                        localChosenAvatarId = id
+                                        showOddballDialog = false
+                                        Toast.makeText(context, "Oddball changed to $name", Toast.LENGTH_SHORT).show()
+                                    }
+                                    .padding(8.dp)
+                            ) {
+                                OddballAvatar(avatarId = id, size = 60.dp)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = name,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                    color = Color.White
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showOddballDialog = false }) {
+                    Text("DONE", color = MugshotNeonLime, fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
+
+    // 4. SEE ALL PLAYERS DIALOG
+    if (showAllPlayersDialog) {
+        AlertDialog(
+            onDismissRequest = { showAllPlayersDialog = false },
+            containerColor = Color(0xFF0F1524),
+            title = {
+                Text(
+                    text = "Squad Roster (${players.size} Players)",
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
+                    color = Color.White
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    players.forEach { p ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFF161E30))
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OddballAvatar(avatarId = p.avatarId, size = 42.dp)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = p.nickname,
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = Color.White
+                                )
+                                Text(
+                                    text = if (p.isHost) "Room Host · Real Player" else "Connected · Real Player",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (p.isHost) MugshotNeonLime else Color(0xFF7A8A9E)
+                                )
+                            }
+                            if (p.isHost) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clip(CircleShape)
+                                        .background(MugshotNeonLime),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Star,
+                                        contentDescription = "Host",
+                                        tint = Color.Black,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAllPlayersDialog = false }) {
+                    Text("CLOSE", color = MugshotNeonLime, fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
+
+    // 5. LAST WALL DIALOG
+    if (showLastWallDialog) {
+        AlertDialog(
+            onDismissRequest = { showLastWallDialog = false },
+            containerColor = Color(0xFF0F1524),
+            title = {
+                Text(
+                    text = "The Last Wall",
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
+                    color = Color.White
+                )
+            },
+            text = {
+                Text(
+                    text = "When only the final circle remains (50m across), the safe boundary becomes stationary. Runners must dodge the seeker in tight quarters until time expires!\n\nLeaving the Last Wall boundary triggers an immediate instant-elimination warning.",
+                    color = Color(0xFFA0ABBE),
+                    lineHeight = 20.sp
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showLastWallDialog = false }) {
+                    Text("UNDERSTOOD", color = MugshotNeonLime, fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MugshotDarkBg)
+    ) {
+        // SCROLLABLE CONTENT
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 18.dp)
+                .padding(bottom = 110.dp) // Leave space for sticky bottom bar
+        ) {
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // TOP BAR: LAST SEEN MUGSHOT + LOBBY & Leave Lobby Button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "LAST SEEN MUGSHOT",
+                        style = MaterialTheme.typography.headlineSmall.copy(
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 0.5.sp
+                        ),
                         color = Color.White
+                    )
+                    Text(
+                        text = "LOBBY",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp
+                        ),
+                        color = Color(0xFF8A9AAF)
+                    )
+                }
+
+                // Leave Lobby Button (Wine / Burgundy rounded pill)
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(MugshotWineButton)
+                        .border(1.dp, MugshotWineBorder, RoundedCornerShape(14.dp))
+                        .clickable(onClick = onLeaveLobby)
+                        .padding(horizontal = 14.dp, vertical = 9.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Leave Lobby",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = Color(0xFFFF8FA3)
                     )
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-            // GAME CODE BOX
-            GlassPanel(
-                modifier = Modifier.fillMaxWidth(),
-                borderColor = ElectricBlue,
-                borderWidth = 1.8.dp,
-                shape = RoundedCornerShape(20.dp)
+            // 1. GAME CODE CARD (Rounded charcoal card with copy, share & show QR)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .shadow(
+                        elevation = 12.dp,
+                        shape = RoundedCornerShape(22.dp),
+                        ambientColor = Color.Black.copy(alpha = 0.6f),
+                        spotColor = Color.Black
+                    )
+                    .clip(RoundedCornerShape(22.dp))
+                    .background(MugshotCardBg)
+                    .border(1.dp, MugshotCardBorder, RoundedCornerShape(22.dp))
+                    .padding(18.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column {
+                    // Header row: GAME CODE label & Copy button
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
-                            Text(
-                                text = "GAME CODE //",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                color = NeonPurple
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = roomConfig.code,
-                                style = MaterialTheme.typography.displayMedium.copy(
-                                    fontWeight = FontWeight.Black,
-                                    letterSpacing = 4.sp
-                                ),
-                                color = Color.White
-                            )
-                        }
+                        Text(
+                            text = "GAME CODE",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.5.sp
+                            ),
+                            color = Color(0xFF7A8A9E)
+                        )
 
-                        // Copy Code Button with Water Shadow
+                        // Copy Icon button
                         Box(
                             modifier = Modifier
-                                .size(48.dp)
-                                .shadow(
-                                    elevation = 8.dp,
-                                    shape = RoundedCornerShape(16.dp),
-                                    ambientColor = WaterShadowAqua.copy(alpha = 0.4f),
-                                    spotColor = LiquidAuroraCyan
-                                )
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(Color(0xCC0D1222))
-                                .border(
-                                    1.4.dp,
-                                    Brush.verticalGradient(listOf(Color(0x88FFFFFF), LiquidAuroraCyan)),
-                                    RoundedCornerShape(16.dp)
-                                )
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFF1A2132))
+                                .border(1.dp, Color(0xFF2B374E), RoundedCornerShape(12.dp))
                                 .clickable {
                                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                    val clip = ClipData.newPlainText("Shadow Hunt Room Code", roomConfig.code)
-                                    clipboard.setPrimaryClip(clip)
-                                    Toast.makeText(context, "Room Code Copied!", Toast.LENGTH_SHORT).show()
+                                    clipboard.setPrimaryClip(ClipData.newPlainText("Game Code", liveConfig.code))
+                                    Toast.makeText(context, "Code copied: ${liveConfig.code}", Toast.LENGTH_SHORT).show()
                                 },
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.ContentCopy,
                                 contentDescription = "Copy Code",
-                                tint = LiquidAuroraCyan,
-                                modifier = Modifier.size(22.dp)
+                                tint = MugshotNeonLime,
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                     }
+
+                    // Huge Room Code Display
+                    Text(
+                        text = liveConfig.code,
+                        style = MaterialTheme.typography.displaySmall.copy(
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 2.sp
+                        ),
+                        color = Color.White
+                    )
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    if (isHost) {
-                        // Host Only Share & QR Buttons with Liquid Glass & Water Shadow
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    // Action Buttons Row: SHARE INVITE & SHOW QR
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // SHARE INVITE
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(Color(0xFF172030))
+                                .border(1.dp, Color(0xFF28364E), RoundedCornerShape(14.dp))
+                                .clickable {
+                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(
+                                            Intent.EXTRA_TEXT,
+                                            "Join my Last Seen Mugshot game! Room Code: ${liveConfig.code}\nLaunch the app and enter the code to join!"
+                                        )
+                                    }
+                                    context.startActivity(Intent.createChooser(shareIntent, "Share Game Code"))
+                                }
+                                .padding(vertical = 12.dp),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Box(modifier = Modifier.weight(1f)) {
-                                LiquidGlassButton(
-                                    text = "Share Code",
-                                    onClick = {
-                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                        val clip = ClipData.newPlainText("Shadow Hunt Room", "Join my Shadow Hunt Squad! Code: ${roomConfig.code}\nLink: https://shadowhunt.app/room/${roomConfig.code}")
-                                        clipboard.setPrimaryClip(clip)
-                                        Toast.makeText(context, "Room Code & Link copied (Host share)!", Toast.LENGTH_SHORT).show()
-                                    },
-                                    icon = Icons.Default.Share,
-                                    trailingText = null,
-                                    gradientColors = listOf(RoyalCyberIris, NeonOrchidPink),
-                                    waterShadowColor = WaterShadowPurple,
-                                    height = 46.dp,
-                                    shape = RoundedCornerShape(23.dp)
-                                )
-                            }
-
-                            Box(modifier = Modifier.weight(1f)) {
-                                LiquidGlassButton(
-                                    text = "Show QR",
-                                    onClick = { showRoomQrDialog = true },
-                                    icon = Icons.Default.QrCode,
-                                    trailingText = null,
-                                    gradientColors = listOf(LiquidAuroraCyan, LiquidSapphireBlue),
-                                    waterShadowColor = WaterShadowAqua,
-                                    height = 46.dp,
-                                    shape = RoundedCornerShape(23.dp)
-                                )
-                            }
-                        }
-                    } else {
-                        // Squad Partner View (Cannot re-share code)
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color(0xFF14192A),
-                            border = BorderStroke(1.dp, Color(0xFF283250)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
-                                    imageVector = Icons.Default.Lock,
+                                    imageVector = Icons.Default.Share,
                                     contentDescription = null,
-                                    tint = GoldAccent,
-                                    modifier = Modifier.size(16.dp)
+                                    tint = MugshotNeonLime,
+                                    modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "PARTNER STATUS: Only the Room Host has permission to share room code & QR. Get ready for host to launch!",
-                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
-                                    color = Color(0xFFBAC5DC)
+                                    text = "SHARE INVITE",
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontWeight = FontWeight.Black,
+                                        letterSpacing = 0.5.sp
+                                    ),
+                                    color = Color.White
                                 )
                             }
                         }
-                    }
-                }
-            }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Notice Banner
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0x33FFB300))
-                    .border(1.dp, Color(0x66FFB300), RoundedCornerShape(12.dp))
-                    .padding(10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.WarningAmber,
-                    contentDescription = null,
-                    tint = Color(0xFFFFB300),
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "MINIMUM 3 PLAYERS: Share Room Code or QR Scanner to invite squad members. The game will unlock and start when at least 3 players join.",
-                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 11.sp),
-                    color = Color(0xFFFFE082)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // STATUS BANNER (Requires minimum 3 players)
-            val hasEnoughPlayers = players.size >= 3
-            val neededPlayers = (3 - players.size).coerceAtLeast(0)
-            val waitingText = if (isStartingCountdown) {
-                "HUNT BEGINS IN: 00:0$countdownSec"
-            } else if (!hasEnoughPlayers) {
-                "WAITING FOR PLAYERS • ${players.size}/3 Joined (Need $neededPlayers more to start)"
-            } else {
-                "READY TO HUNT • ${players.size}/${roomConfig.maxPlayers} PLAYERS READY"
-            }
-
-            GlassPanel(
-                modifier = Modifier.fillMaxWidth(),
-                borderColor = if (hasEnoughPlayers) NeonGreen else NeonRed,
-                backgroundColor = if (hasEnoughPlayers) Color(0x3300E676) else Color(0x33FF1E43),
-                shape = RoundedCornerShape(14.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 12.dp, horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = if (hasEnoughPlayers) Icons.Default.SportsEsports else Icons.Default.HourglassTop,
-                        contentDescription = null,
-                        tint = if (hasEnoughPlayers) NeonGreen else NeonRed,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = waitingText,
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
-                        color = Color.White
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(18.dp))
-
-            // YOUR CREW SECTION
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "YOUR CREW //",
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
-                        color = Color.White
-                    )
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (isHost && players.size < roomConfig.maxPlayers) {
-                        Button(
-                            onClick = {
-                                onAddBot()
-                                Toast.makeText(context, "Invited squad partner joined via Room Code ${roomConfig.code}!", Toast.LENGTH_SHORT).show()
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = ElectricBlue.copy(alpha = 0.2f)),
-                            border = BorderStroke(1.dp, ElectricBlue),
-                            shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                            modifier = Modifier.padding(end = 8.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.QrCodeScanner,
-                                contentDescription = null,
-                                tint = ElectricBlue,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "+ Join (Code/QR)",
-                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
-                                color = ElectricBlue
-                            )
-                        }
-                    }
-                    Text(
-                        text = "${players.size} / ${roomConfig.maxPlayers} players",
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                        color = if (players.size >= 3) NeonGreen else NeonPurple
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // CREW SLOTS GRID
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                // Actual players
-                players.forEach { player ->
-                    val avatarOpt = AvatarRegistry.getAvatar(player.avatarId)
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.width(82.dp)
-                    ) {
+                        // SHOW QR
                         Box(
                             modifier = Modifier
-                                .size(76.dp)
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(DarkSurfaceVariant)
-                                .border(
-                                    width = 2.dp,
-                                    color = if (player.isHost) GoldAccent else ElectricBlue,
-                                    shape = RoundedCornerShape(16.dp)
-                                )
-                        ) {
-                            Image(
-                                painter = painterResource(id = avatarOpt.drawableRes),
-                                contentDescription = player.nickname,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                            if (player.isHost) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(22.dp)
-                                        .align(Alignment.TopEnd)
-                                        .padding(2.dp)
-                                        .clip(CircleShape)
-                                        .background(GoldAccent),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.EmojiEvents,
-                                        contentDescription = "Host",
-                                        tint = Color.Black,
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                }
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = player.nickname,
-                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                            color = Color.White,
-                            maxLines = 1
-                        )
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(if (player.isHost) GoldAccent.copy(alpha = 0.2f) else NeonGreen.copy(alpha = 0.2f))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = if (player.isHost) "HOST" else "READY",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Black
-                                ),
-                                color = if (player.isHost) GoldAccent else NeonGreen
-                            )
-                        }
-                    }
-                }
-
-                // Empty Slots with + to invite / add player via Room Code or QR scanner
-                val emptySlots = (roomConfig.maxPlayers - players.size).coerceAtLeast(0)
-                for (i in 0 until emptySlots) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.width(82.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(76.dp)
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(DarkSurfaceGlass)
-                                .border(1.dp, if (i == 0 && players.size < 3) ElectricBlue else DarkCardBorder, RoundedCornerShape(16.dp))
-                                .clickable {
-                                    onAddBot()
-                                    Toast.makeText(context, "Squad member joined via Room Code ${roomConfig.code}!", Toast.LENGTH_SHORT).show()
-                                },
+                                .weight(1f)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(Color(0xFF172030))
+                                .border(1.dp, Color(0xFF28364E), RoundedCornerShape(14.dp))
+                                .clickable { showScanToJoinSheet = true }
+                                .padding(vertical = 12.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.PersonAdd,
-                                contentDescription = "Invite Squad Player",
-                                tint = if (i == 0 && players.size < 3) ElectricBlue else TextMuted,
-                                modifier = Modifier.size(28.dp)
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.QrCode2,
+                                    contentDescription = null,
+                                    tint = MugshotNeonLime,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "SHOW QR",
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontWeight = FontWeight.Black,
+                                        letterSpacing = 0.5.sp
+                                    ),
+                                    color = Color.White
+                                )
+                            }
                         }
-                        Spacer(modifier = Modifier.height(6.dp))
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // 2. PLAYER REQUIREMENT BANNER (Red pill when < 3, Green pill when >= 3)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(if (isReadyToStart) MugshotOliveBg else MugshotRedBg)
+                    .border(
+                        1.dp,
+                        if (isReadyToStart) MugshotOliveBorder else MugshotRedBorder,
+                        RoundedCornerShape(16.dp)
+                    )
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Indicator Dot
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(if (isReadyToStart) MugshotNeonLime else Color(0xFFFF3355))
+                    )
+
+                    Spacer(modifier = Modifier.width(10.dp))
+
+                    Column {
                         Text(
-                            text = "Real Friend Slot",
-                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 10.sp),
-                            color = TextMuted
+                            text = if (isReadyToStart) {
+                                "Squad Ready to Start"
+                            } else {
+                                "Need $neededPlayers more to start"
+                            },
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.Black
+                            ),
+                            color = Color.White
                         )
                         Text(
-                            text = "Scan QR to Join",
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
-                            color = ElectricBlue
+                            text = if (isReadyToStart) {
+                                "$playersCount players in lobby · Minimum $requiredPlayers reached"
+                            } else {
+                                "Waiting for players · minimum $requiredPlayers."
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (isReadyToStart) Color(0xFFA6E07A) else Color(0xFFC0707C)
                         )
                     }
                 }
@@ -532,115 +498,344 @@ fun LobbyScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // ARENA & DURATION RECAP CARD
-            GlassPanel(
+            // 3. YOUR CREW SECTION
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                borderColor = Color(0xFF282B48),
-                shape = RoundedCornerShape(16.dp)
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(NeonRed.copy(alpha = 0.2f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.GpsFixed,
-                                contentDescription = null,
-                                tint = NeonRed,
-                                modifier = Modifier.size(22.dp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Your crew",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 0.5.sp
+                        ),
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "✳",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+                        color = MugshotNeonLime
+                    )
+                }
+
+                Text(
+                    text = "${playersCount.toString().padStart(2, '0')} / ${roomConfig.maxPlayers.coerceAtLeast(30)} players",
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = Color(0xFFA0ABBE)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Crew Members Horizontal Scroll List
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(players) { player ->
+                    val isThisHost = player.isHost
+
+                    Box(
+                        modifier = Modifier
+                            .width(112.dp)
+                            .shadow(
+                                elevation = if (isThisHost) 8.dp else 2.dp,
+                                shape = RoundedCornerShape(18.dp),
+                                ambientColor = if (isThisHost) WaterShadowLime else Color.Transparent,
+                                spotColor = if (isThisHost) MugshotNeonLime else Color.Transparent
                             )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text(
-                                text = "REAL GPS SATELLITE ARENA",
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                color = Color.White
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(MugshotCardBg)
+                            .border(
+                                width = if (isThisHost) 2.dp else 1.dp,
+                                color = if (isThisHost) MugshotNeonLime else MugshotCardBorder,
+                                shape = RoundedCornerShape(18.dp)
                             )
+                            .padding(10.dp)
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            // Avatar Box with optional Host Star Badge
+                            Box(contentAlignment = Alignment.TopEnd) {
+                                val displayAvatar = if (player.isLocalPlayer) localChosenAvatarId else player.avatarId
+                                OddballAvatar(avatarId = displayAvatar, size = 66.dp)
+
+                                if (isThisHost) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(20.dp)
+                                            .offset(x = 4.dp, y = (-4).dp)
+                                            .clip(CircleShape)
+                                            .background(MugshotNeonLime),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Star,
+                                            contentDescription = "Host",
+                                            tint = Color.Black,
+                                            modifier = Modifier.size(13.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Nickname
                             Text(
-                                text = "${roomConfig.durationMinutes} min • Live GPS Outdoor Hunt (Min 1.0 km Safe Zone)",
-                                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 11.sp),
-                                color = TextSecondary
+                                text = player.nickname,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.Black
+                                ),
+                                color = Color.White,
+                                maxLines = 1
+                            )
+
+                            // Status subtitle
+                            Text(
+                                text = if (player.isLocalPlayer) "You · Host" else "In lobby",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                color = if (player.isLocalPlayer) MugshotNeonLime else Color(0xFF6E7E95)
                             )
                         }
                     }
-
-                    Image(
-                        painter = painterResource(id = R.drawable.thumb_neon_city),
-                        contentDescription = "Neon City",
-                        modifier = Modifier
-                            .size(width = 54.dp, height = 34.dp)
-                            .clip(RoundedCornerShape(8.dp)),
-                        contentScale = ContentScale.Crop
-                    )
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-            // START GAME BUTTON (Requires minimum 3 players)
-            if (isHost) {
-                NeonGamingButton(
-                    text = if (isStartingCountdown) {
-                        "STARTING IN $countdownSec..."
-                    } else if (!hasEnoughPlayers) {
-                        "LOCKED: NEED 3 PLAYERS (${players.size}/3)"
-                    } else {
-                        "START GAME (${players.size} PLAYERS)"
-                    },
-                    onClick = {
-                        if (!hasEnoughPlayers) {
-                            Toast.makeText(
-                                context,
-                                "Cannot start match! Minimum 3 players required. Share Room Code ${roomConfig.code} or QR code to invite squad members.",
-                                Toast.LENGTH_LONG
-                            ).show()
-                        } else {
-                            isStartingCountdown = true
-                        }
-                    },
-                    icon = if (hasEnoughPlayers) Icons.Default.PlayArrow else Icons.Default.Lock,
-                    gradientColors = if (hasEnoughPlayers) {
-                        listOf(Color(0xFFFF1E43), Color(0xFFD50000))
-                    } else {
-                        listOf(Color(0xFF263238), Color(0xFF1E2429))
-                    },
-                    borderColor = if (hasEnoughPlayers) Color(0xFFFF5252) else Color(0xFF455A64),
-                    height = 58.dp
+            // Action Row: "Change Oddball" & "SEE ALL PLAYERS"
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Change Oddball Link
+                Text(
+                    text = "Change Oddball",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        textDecoration = TextDecoration.Underline
+                    ),
+                    color = MugshotNeonLime,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable { showOddballDialog = true }
+                        .padding(vertical = 4.dp)
                 )
+
+                // SEE ALL PLAYERS Pill Button
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color(0xFF161E30))
+                        .border(1.dp, Color(0xFF28364E), RoundedCornerShape(14.dp))
+                        .clickable { showAllPlayersDialog = true }
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Group,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "SEE ALL PLAYERS",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 0.5.sp
+                            ),
+                            color = Color.White
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // 4. GAME MODE SELECTOR CARD ("STANDARD" / "CUSTOM" with "EDIT ->" button)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(MugshotCardBg)
+                    .border(1.dp, MugshotCardBorder, RoundedCornerShape(18.dp))
+                    .clickable { showGameFeelSheet = true }
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    // Target or Tune Icon
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF1A2616)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Adjust,
+                            contentDescription = null,
+                            tint = MugshotNeonLime,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Column {
+                        val isStandard = liveConfig.durationMinutes == 20 && liveConfig.safeZoneRadiusMeters.toInt() == 160
+                        Text(
+                            text = if (isStandard) "STANDARD" else "CUSTOM",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 0.5.sp
+                            ),
+                            color = Color.White
+                        )
+                        Text(
+                            text = if (isStandard) {
+                                "20 min · The full game"
+                            } else {
+                                "${liveConfig.durationMinutes} min · ${liveConfig.safeZoneRadiusMeters.toInt()} m circle"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFFA0ABBE)
+                        )
+                    }
+                }
+
+                // EDIT -> Pill Button
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(MugshotOliveButton)
+                        .border(1.dp, MugshotOliveBorder, RoundedCornerShape(14.dp))
+                        .clickable { showGameFeelSheet = true }
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "EDIT",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 0.5.sp
+                            ),
+                            color = MugshotNeonLime
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Default.ArrowForward,
+                            contentDescription = "Edit",
+                            tint = MugshotNeonLime,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // 5. "Last Wall" link
+            Text(
+                text = "Last Wall",
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    textDecoration = TextDecoration.Underline
+                ),
+                color = Color(0xFFA0ABBE),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .clickable { showLastWallDialog = true }
+                    .padding(vertical = 4.dp)
+            )
+
+            Spacer(modifier = Modifier.height(18.dp))
+        }
+
+        // STICKY BOTTOM ACTION BAR (Matching Screenshot 1 & 2)
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 18.dp, vertical = 14.dp)
+        ) {
+            if (isReadyToStart) {
+                // ACTIVE: Vibrant Neon Lime pill button with black text and right arrow
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(60.dp)
+                        .shadow(
+                            elevation = 16.dp,
+                            shape = RoundedCornerShape(30.dp),
+                            ambientColor = WaterShadowLime,
+                            spotColor = MugshotNeonLime
+                        )
+                        .clip(RoundedCornerShape(30.dp))
+                        .background(
+                            brush = Brush.horizontalGradient(
+                                listOf(MugshotNeonLime, Color(0xFFD4FF33))
+                            )
+                        )
+                        .clickable(onClick = onStartGame),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = "START GAME",
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 1.sp
+                            ),
+                            color = Color.Black
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Icon(
+                            imageVector = Icons.Default.ArrowForward,
+                            contentDescription = "Start",
+                            tint = Color.Black,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
             } else {
-                NeonGamingButton(
-                    text = if (hasEnoughPlayers) "READY TO PLAY" else "WAITING FOR PLAYERS (${players.size}/3)",
-                    onClick = {
-                        if (!hasEnoughPlayers) {
-                            Toast.makeText(
-                                context,
-                                "Waiting for squad! Match starts when at least 3 players join via Room Code or QR scanner.",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        } else {
-                            onToggleReady()
-                        }
-                    },
-                    icon = if (hasEnoughPlayers) Icons.Default.Check else Icons.Default.HourglassEmpty,
-                    gradientColors = if (hasEnoughPlayers) {
-                        listOf(Color(0xFF00E676), Color(0xFF00B0FF))
-                    } else {
-                        listOf(Color(0xFF263238), Color(0xFF1E2429))
-                    },
-                    borderColor = if (hasEnoughPlayers) Color(0xFF69F0AE) else Color(0xFF455A64),
-                    height = 58.dp
-                )
+                // INACTIVE / DISABLED: Dark muted olive pill "NEED X MORE"
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(60.dp)
+                        .clip(RoundedCornerShape(30.dp))
+                        .background(Color(0xFF1E2818))
+                        .border(1.dp, Color(0xFF2C3B24), RoundedCornerShape(30.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "NEED $neededPlayers MORE",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.sp
+                        ),
+                        color = Color(0xFF5B6E52)
+                    )
+                }
             }
         }
     }

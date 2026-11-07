@@ -117,8 +117,8 @@ fun ShadowHuntApp(
     var userProfile by remember {
         mutableStateOf(
             UserProfileData(
-                nickname = "Kishalay_007",
-                avatarId = "kishalay",
+                nickname = "Hunter",
+                avatarId = "krish",
                 level = 12,
                 currentXp = 850,
                 maxXp = 1200,

@@ -120,7 +120,7 @@ class ShadowHuntEngine(
         initialPlayers.add(
             PlayerState(
                 id = "p_local",
-                nickname = localPlayerNickname.ifEmpty { "Kishalay_007" },
+                nickname = localPlayerNickname.ifEmpty { "Hunter" },
                 avatarId = localAvatarId,
                 role = preferredRole ?: PlayerRole.SEEKER,
                 isHost = true,

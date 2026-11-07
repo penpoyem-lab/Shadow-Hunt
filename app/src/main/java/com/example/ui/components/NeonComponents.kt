@@ -73,6 +73,7 @@ fun LiquidGlassButton(
     waterShadowColor: Color = WaterShadowCrimson,
     height: Dp = 58.dp,
     shape: Shape = RoundedCornerShape(30.dp),
+    textColor: Color = Color.White,
     enabled: Boolean = true
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -163,7 +164,7 @@ fun LiquidGlassButton(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = Color.White,
+                    tint = textColor,
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(modifier = Modifier.width(10.dp))
@@ -173,7 +174,7 @@ fun LiquidGlassButton(
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.ExtraBold,
                     letterSpacing = 1.3.sp,
-                    color = Color.White
+                    color = textColor
                 )
             )
             if (trailingText != null) {
@@ -182,7 +183,7 @@ fun LiquidGlassButton(
                     text = trailingText,
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Black,
-                        color = Color.White.copy(alpha = 0.9f)
+                        color = textColor.copy(alpha = 0.9f)
                     )
                 )
             }

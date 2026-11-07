@@ -1,143 +1,70 @@
-# Real GPS Outdoor Hunt: Cloud Multi-Player & Pure Human Protocol
+# "Last Seen Mugshot" Interface Redesign & Pure Human Protocol
 
-Architectural plan to convert the game into a 100% genuine outdoor real-time multiplayer GPS hunt: eliminating all bot players, removing virtual arena fallbacks, establishing real-time cloud room synchronization across separate phones, and strictly requiring 3 real human players to launch.
+Implementation plan to build the exact "Last Seen Mugshot" interface shown in the user's reference screenshots, blending the signature Neon Lime palette with liquid glass capsule effects and enforcing the strict 3-real-human player requirement.
 
-## User Review & Critical Decisions
+## 1. Visual & Architectural Overview
 
-> [!IMPORTANT]
-> The following product decisions were confirmed during interactive planning:
+Based on the 4 provided reference screenshots:
+1. **Lobby Screen (`IMG_20261106_143302_2db62686.jpg`, `IMG_20261106_143604_39b6ab50.jpg`)**:
+   - Header: "LAST SEEN MUGSHOT" title, "LOBBY" subtitle, and top-right "Leave Lobby" wine-colored rounded button.
+   - Game Code Card: "GAME CODE" label, large white bold room code (e.g. `E8SYEC`), copy icon button, and dual "SHARE INVITE" + "SHOW QR" actions.
+   - Requirement Banner:
+     - When `< 3` players: Dark wine/crimson pill banner "🔴 Need X more to start / Waiting for players · minimum 3."
+     - When `3+` players: Dark olive/green pill banner "🟢 Squad Ready / X real players in lobby"
+   - "Your crew ✳" Section:
+     - Player count "01 / 30 players".
+     - Cute "Oddball" creature avatar cards with star host badge, nickname, and "You · Host" / "In lobby" status. Host card glows with `NeonLime` border.
+     - Action buttons: "Change Oddball" text link and "👥 SEE ALL PLAYERS" pill.
+   - Game Mode Selector Card:
+     - Target icon with "STANDARD / 20 min · The full game" or "CUSTOM / X min · Y m circle".
+     - "EDIT ->" button in olive green with bright neon lime text that opens the "GAME FEEL" bottom sheet.
+   - "Last Wall" link.
+   - Sticky Bottom Button:
+     - When `< 3` players: Disabled olive/charcoal pill "NEED X MORE".
+     - When `3+` players: Full-width vibrant Neon Lime (`#C8FF00`) capsule button "START GAME ->" with bold black text, water shadow, and tactile bounce.
 
-- **Confirmed Decision 1 (Pure Real GPS Outdoor Arena)**: Completely remove all virtual 2D arena concepts, bot logic, and virtual disclaimer text. The app runs exclusively on hardware GPS telemetry and high-detail satellite maps in the real world.
-- **Confirmed Decision 2 (Strictly Zero Bots)**: Bot players are completely eliminated. The lobby starts with only the Host (`1/3`), and will not allow match start until at least 2 other real humans join using the Room Code or QR scanner (`3/3`).
-- **Confirmed Decision 3 (Real-Time Cloud Synchronization)**: Rooms, lobby memberships, and live player GPS coordinates will synchronize in real time via Firebase Firestore so friends on separate devices can join instantly and track each other on the satellite map.
+2. **Game Feel Settings Bottom Sheet (`IMG_20261106_143321_4a4bde20.jpg`)**:
+   - "GAME FEEL" header with close "✕" button.
+   - 3 Preset Cards: "INTENSE" (12 min / 120 m), "STANDARD" (20 min / 160 m), and "CHILL" (30 min / 220 m).
+   - "YOUR OWN SETTINGS" in neon lime with live summary and "Back to recommended".
+   - Custom parameters panel:
+     - Round length dropdown.
+     - Circle radius input with quick chips: 50m, 100m, 250m, 500m, 1km, 2km, 5km, 10km.
+     - Head start dropdown (15s, 30s, 45s, 60s) with explanatory rule text.
+     - Zone physics & area calculations.
 
----
+3. **Scan to Join QR Bottom Sheet (`IMG_20261106_143312_ffe9b7eb.jpg`)**:
+   - "SCAN TO JOIN" header with close "✕" button.
+   - Subtitle: "Scan this code with your phone camera to open the invite link."
+   - Large QR Code canvas framed with vibrant Neon Lime scanner corner brackets.
+   - "GAME CODE" subtitle and large glowing Neon Lime room code.
 
-## 1. Overview & Core Concept
-
-### What It Does
-An outdoor tactical game played by real friends on their own mobile devices. The game Host creates a room with a 6-character room code and QR code. Friends open their app, scan the host's QR code or type the code, and join the lobby. The game strictly enforces a 3-human minimum before the host can start the match. Once started, players hunt each other inside a geographically locked 1.0 km safe circle zone using real hardware GPS, high-detail satellite imagery, and tactile proximity alerts.
-
-### Target Audience & Real-World Context
-Groups of 3 or more friends playing outdoors in parks, campuses, neighborhoods, or sports fields without simulated bot fillers.
-
----
-
-## 2. User Experience & Visual Design
-
-### Key User Flows
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ 1. HOST CREATES ROOM                                                        │
-│ Host sets Safe Zone (min 1.0 km) -> Generates Room Code (e.g. SH7921) & QR  │
-└──────────────────────────────────────┬──────────────────────────────────────┘
-                                       │
-                                       ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ 2. LOBBY (STRICT 3-HUMAN GATE)                                              │
-│ • State 1/3: "WAITING FOR PLAYERS (1/3 Joined - Need 2 real players)" [RED] │
-│ • START GAME Button: LOCKED with Lock icon                                  │
-│ • Host shares Room Code or presents full-screen QR code                     │
-└──────────────────────────────────────┬──────────────────────────────────────┘
-                                       │
-                                       ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ 3. SQUAD MEMBERS JOIN ACROSS PHONES                                         │
-│ • Friend 2 scans QR code -> Joins lobby -> Lobby auto-updates to 2/3        │
-│ • Friend 3 scans QR code -> Joins lobby -> Lobby auto-updates to 3/3 [GREEN]│
-│ • START GAME Button UNLOCKS: "START MATCH (3 PLAYERS)"                      │
-└──────────────────────────────────────┬──────────────────────────────────────┘
-                                       │
-                                       ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ 4. REAL OUTDOOR SATELLITE ARENA                                             │
-│ • Host launches game -> All phones transition to Satellite Map              │
-│ • 1 Seeker and 2 Hiders randomly and smartly assigned                       │
-│ • Safe Zone locked permanently to geographic start center (min 1.0 km)       │
-│ • Live GPS precision halo (±Xm) & real-time multi-phone location streaming   │
-│ • Proximity alert siren & haptics when Seeker gets within <= 8m of a Hider  │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-### Visual Identity & Theme
-- **Theme**: Neon Tactical Cyber-Ops (M3 Dark Theme, `Color(0xFF060A14)` background, `ElectricBlue`, `NeonGreen`, `NeonRed`, `GoldAccent`).
-- **Lobby Roster**: Real human avatars with live connection status dots ("REAL PLAYER", "CONNECTED").
-- **Lockdown Indicator**: Status banner in the lobby clearly indicates exact player counts needed:
-  - `1/3`: Red border & background `Need 2 more real players`.
-  - `2/3`: Amber border & background `Need 1 more real player`.
-  - `3/3+`: Neon green border & background `Squad Ready • 3 Players Connected`.
-- **Top Bar in Arena**: Clean layout with `[Pause] [LIVE SATELLITE] [Match Timer] [Runners Count] [Minimap Toggle]` without overcrowding or unwanted buttons.
+4. **Oddball Avatar System**:
+   - Custom vector illustrations representing the distinctive creatures seen in the screenshots (Cyclops alien with teal body, purple teardrop creature with hooded eyes, spiky star creature, etc.).
 
 ---
 
-## 3. Key Product Decisions & Trade-Offs
+## 2. Step-by-Step Implementation
 
-### 1. Total Removal of Bot Generation & Virtual Arena
-- **Decision**: Remove bot generation arrays (`botNames`, `botAvatars`) and the 2D simulated arena screen (`GameArenaScreen.kt`).
-- **Rationale**: The user explicitly requested: *"It's not ani vertual arena, real gps location is required.......Only real life human player are needed (no bot player ).."*
-- **Outcome**: The app is 100% focused on real GPS outdoor play.
+1. **Color Tokens (`Color.kt`)**:
+   - Add `MugshotNeonLime = Color(0xFFC8FF00)`, `MugshotDarkBg = Color(0xFF0A0E18)`, `MugshotCardBg = Color(0xFF111724)`, `MugshotCardBorder = Color(0xFF1E283A)`, `MugshotWineButton = Color(0xFF2C141B)`, `MugshotRedBg = Color(0xFF2A1116)`, `MugshotRedBorder = Color(0xFF551C25)`, `WaterShadowLime = Color(0x66C8FF00)`.
 
-### 2. Cloud-Backed Real-Time Room Synchronization
-- **Decision**: Use Firebase Firestore for room state, lobby presence, and GPS position streaming.
-- **Rationale**: Real human players on different phones need a reliable, serverless way to discover rooms, join via room code/QR, and synchronize coordinates outdoors over cellular/5G data.
-- **Security & Structure**: Zero-trust rules where room creators are hosts, players can only update their own participant document, and room status governs match transitions.
+2. **Oddball Avatar Component (`OddballAvatars.kt`)**:
+   - Render vector-drawn Oddballs with distinct character expressions, vibrant neon fills, and customizable colors.
 
----
+3. **Game Feel Bottom Sheet (`GameFeelBottomSheet.kt`)**:
+   - Build the interactive modal bottom sheet with presets, circle radius chips, custom numeric inputs, and live validation.
 
-## 4. Technical Architecture & Data Strategy
+4. **Scan to Join Modal (`ScanToJoinBottomSheet.kt`)**:
+   - Build the QR invite sheet with neon lime corner scanner brackets and room code.
 
-### System Architecture Diagram
+5. **Lobby Screen Overhaul (`LobbyScreen.kt`)**:
+   - Reconstruct the layout to match `IMG_20261106_143302_2db62686.jpg` and `IMG_20261106_143604_39b6ab50.jpg`.
+   - Wire all buttons, sheets, and the strict 3-player start requirement.
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                            FIREBASE FIRESTORE                               │
-│                                                                             │
-│  Collection: rooms/{roomCode}                                               │
-│  ├── roomCode: "SH7921"                                                     │
-│  ├── hostId: "user_abc"                                                     │
-│  ├── status: "LOBBY" | "ACTIVE" | "FINISHED"                                │
-│  ├── safeZone: { lat: 37.7749, lon: -122.4194, radiusMeters: 1000 }         │
-│  └── Subcollection: players/{userId}                                        │
-│      ├── nickname: "Kishalay"                                               │
-│      ├── avatarId: "cyber"                                                  │
-│      ├── role: "SEEKER" | "RUNNER"                                          │
-│      ├── isHost: true                                                       │
-│      ├── lat: 37.7749, lon: -122.4194, accuracy: 4.5                       │
-│      └── lastUpdated: Timestamp                                             │
-└───────────────────────▲─────────────────────────────▲───────────────────────┘
-                        │ Real-Time Snapshot          │ Real-Time Snapshot
-                        │ Updates                     │ Updates
-        ┌───────────────┴───────────────┐     ┌───────┴───────────────────────┐
-        │        PHONE 1 (HOST)         │     │     PHONE 2 & 3 (PARTNERS)    │
-        │ • Creates Room SH7921         │     │ • Scan QR or Enter Code       │
-        │ • Displays QR / Code          │     │ • Join room in Firestore      │
-        │ • Listens to players subcoll  │     │ • Stream GPS coords to cloud  │
-        │ • Unlocks Start when >= 3     │     │ • Render real players on map  │
-        └───────────────────────────────┘     └───────────────────────────────┘
-```
+6. **Real-Life GPS Map & UI Polish**:
+   - Fixed the grey map tile grid showing "Map data not yet available": replaced limited ArcGIS imagery with Google Hybrid Satellite, CartoDB Dark Matter, and OpenStreetMap tiles with automated resilient fallback and duplicate-request suppression (`inFlight`).
+   - Centered tactical map on user's live physical GPS coordinates (`26.06139, 89.29616`) with real hardware GPS tracking, live precision halo (±6m), speed, heading, and boundary proximity calculation.
+   - Removed all hardcoded demo names ("Kishalay007") and password input barriers, replacing them with fluid codename entry and Oddball creature selection.
+   - Implemented high quality liquid glass UI effect with neon lime highlights, specular shine, and water shadows across the "CREATE A GAME" section and gameplay HUD.
 
-### Key Implementation Steps
-
-1. **Firebase Backend Provisioning**:
-   - Provision Firestore for real-time room and player coordination.
-   - Configure security rules for rooms and live player tracking.
-
-2. **Real Cloud Room Repository (`RealGameRoomRepository.kt`)**:
-   - `createRoom(roomConfig, hostPlayer)`: Creates document in `rooms/{code}`.
-   - `joinRoom(code, player)`: Adds player to `rooms/{code}/players/{userId}`.
-   - `observeRoom(code)`: Returns a Flow/StateFlow of connected real players and room state.
-   - `updatePlayerLocation(code, userId, lat, lon, accuracy)`: Continuously syncs live GPS coordinates during match.
-   - `startMatch(code)`: Host updates room status to `"ACTIVE"`, automatically transitioning all connected phones to the live arena.
-
-3. **Lobby Overhaul (`LobbyScreen.kt`)**:
-   - Remove bot slots and bot generation buttons.
-   - Display real human player cards with live status indicators.
-   - Lock match start until `players.size >= 3`.
-   - Start button unlocks only when 3 or more real humans are connected.
-
-4. **Pure GPS Arena (`RealOutdoorArenaScreen.kt` & `RealOutdoorGameEngine.kt`)**:
-   - Connect live GPS updates of all squad members from Firestore to the `DarkTacticalMap`.
-   - Geographically locked 1.0 km safe zone.
-   - Dynamic GPS accuracy ring and live telemetry badge.
-   - Proximity detection ($\le 8\text{m}$) using real coordinates from all connected players.

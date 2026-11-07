@@ -1,6 +1,6 @@
 {
-  "summary": "Implementation plan for Real GPS Outdoor Hunt: Cloud multi-player sync across separate devices, elimination of all bot players, and strict 3-human minimum lobby requirement.",
-  "updatedAt": "2026-11-06T08:21:00.147906540Z",
-  "requestFeedback": true,
-  "userFacing": true
+  "summary":  "Implementation plan to recreate the exact 'Last Seen Mugshot' interface from user screenshots:\n- Redesign LobbyScreen with Game Code card, Copy, Share Invite, Show QR, Red/Green min-3 player requirement status banner, 'Your crew ✳' Oddball cards with Host star badge, 'Change Oddball' & 'SEE ALL PLAYERS' buttons, Game Mode card with 'EDIT ->', and sticky 'NEED X MORE' / 'START GAME ->' dynamic neon lime button.\n- Create 'GAME FEEL' modal bottom sheet with INTENSE / STANDARD / CHILL presets, circle radius pills (50m to 10km), round length and head start dropdowns, and zone physics info.\n- Redesign 'SCAN TO JOIN' QR modal with neon lime corner brackets and glowing game code.\n- Blend signature Neon Lime (#C8FF00) accents with liquid glass capsule effects and water shadows.",
+  "updatedAt":  "2026-11-07T06:44:42.743586584Z",
+  "requestFeedback":  true,
+  "userFacing":  true
 }
